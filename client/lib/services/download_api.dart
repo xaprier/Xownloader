@@ -69,7 +69,13 @@ class DownloadApi {
     return _jobResponse(response);
   }
 
-  Uri fileUri(String jobId) => _uri('/api/v1/downloads/$jobId/file');
+  Uri fileUri(String jobId, {String? displayName}) {
+    const base = '/api/v1/downloads';
+    if (displayName == null || displayName.isEmpty) {
+      return _uri('$base/$jobId/file');
+    }
+    return _uri('$base/$jobId/file/${Uri.encodeComponent(displayName)}');
+  }
 
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',

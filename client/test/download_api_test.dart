@@ -50,6 +50,22 @@ void main() {
     });
   });
 
+  test('fileUri builds a plain path without a display name', () {
+    final api = DownloadApi(baseUrl: 'http://host:8000');
+    expect(
+      api.fileUri('job-1').toString(),
+      'http://host:8000/api/v1/downloads/job-1/file',
+    );
+  });
+
+  test('fileUri appends an encoded display name segment', () {
+    final api = DownloadApi(baseUrl: 'http://host:8000');
+    expect(
+      api.fileUri('job-1', displayName: 'My Video.mp4').toString(),
+      'http://host:8000/api/v1/downloads/job-1/file/My%20Video.mp4',
+    );
+  });
+
   test('previews a URL before creating a download', () async {
     final client = FakeHttpClient(_previewJson);
     final api = DownloadApi(

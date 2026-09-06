@@ -456,7 +456,9 @@ class _JobStatusCard extends StatelessWidget {
             ],
             if (job.status == DownloadStatus.completed) ...[
               const SizedBox(height: 8),
-              ResultActions(fileUri: api.fileUri(job.id)),
+              ResultActions(
+                fileUri: api.fileUri(job.id, displayName: job.displayName),
+              ),
             ],
           ],
         ),
