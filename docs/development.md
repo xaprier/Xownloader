@@ -14,6 +14,9 @@ uv run uvicorn xownloader_server.main:app --reload
 output directory, and the configured disk reserve are usable. `/metrics` exposes basic
 download counters for monitoring.
 
+To run the server in a container instead: `cd server && docker compose up -d --build`
+(FFmpeg is bundled). See [operations.md](operations.md#container) for details.
+
 ## Flutter client
 
 Install the Flutter stable channel and follow `client/README.md`. Flutter is the single

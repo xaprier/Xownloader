@@ -49,6 +49,13 @@ uv run uvicorn xownloader_server.main:app --reload
 The API is then available at `http://127.0.0.1:8000`. The health endpoint is
 `GET /health`, and the OpenAPI document is available at `/docs`.
 
+Or run it in a container (FFmpeg bundled):
+
+```bash
+cd server
+docker compose up -d --build
+```
+
 ## Client setup
 
 The Flutter client lives in `client/` and targets mobile, desktop, and web platforms.

@@ -1,0 +1,36 @@
+services:
+  server:
+    build:
+      context: .
+    image: xownloader-server
+    ports:
+      - "8000:8000"
+    # Optional: provide deployment values (tokens, CORS, policy limits).
+    # Copy .env.example to .env to use it; runs on image defaults when absent.
+    env_file:
+      - path: .env
+        required: false
+    # Run as the host user that owns ./data so the bind-mounted downloads and
+    # SQLite database are writable. Override for a different owner:
+    #   XOWNLOADER_UID=$(id -u) XOWNLOADER_GID=$(id -g) docker compose up -d
+    user: "${XOWNLOADER_UID:-1000}:${XOWNLOADER_GID:-1000}"
+    environment:
+      # The container always binds all interfaces regardless of .env.
+      XOWNLOADER_HOST: 0.0.0.0
+      XOWNLOADER_DOWNLOAD_DIRECTORY: /data/downloads
+      XOWNLOADER_DATABASE_PATH: /data/xownloader.db
+      HOME: /tmp
+    volumes:
+      # Downloads and the SQLite database live on the host for backup/inspection.
+      - ./data:/data
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3

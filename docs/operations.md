@@ -6,6 +6,34 @@ Install Python 3.11 or newer, `uv`, `yt-dlp`, FFmpeg, and ffprobe. The server mu
 write access to its download directory and enough free disk space for the configured
 reserve plus the expected output size.
 
+The container image (below) already bundles Python, the dependencies, and FFmpeg.
+
+## Container
+
+`server/Dockerfile` builds a self-contained image (multi-stage `uv` build, FFmpeg
+bundled). `server/compose.yaml` runs it.
+
+```bash
+cd server
+cp .env.example .env          # optional; the image has working defaults
+docker compose up -d --build
+curl -f http://localhost:8000/health
+curl -s   http://localhost:8000/ready   # expect "ready": true
+```
+
+- Downloads and the SQLite database are bind-mounted to `server/data/` on the host, so
+  the database-backup steps below apply to `server/data/xownloader.db` directly.
+- The container process runs as UID/GID `1000:1000` so it can write the bind mount.
+  If `server/data/` is owned by a different user, start it with that owner:
+  `XOWNLOADER_UID=$(id -u) XOWNLOADER_GID=$(id -g) docker compose up -d`.
+- The container always binds `0.0.0.0` inside its network namespace; publish the port
+  (`ports: "8000:8000"`) or place it behind a reverse proxy that terminates TLS.
+- `.env` values still apply — set `XOWNLOADER_CLIENT_API_TOKEN`,
+  `XOWNLOADER_ADMIN_API_TOKEN`, and `XOWNLOADER_CORS_ALLOWED_ORIGINS` for a real
+  deployment. `XOWNLOADER_HOST`, `XOWNLOADER_DOWNLOAD_DIRECTORY`, and
+  `XOWNLOADER_DATABASE_PATH` are fixed by compose and should not be overridden.
+- `docker compose down` stops the server; the bind-mounted data survives.
+
 ## Configuration
 
 Copy `server/.env.example` to `server/.env` and set deployment-specific values. At minimum,
