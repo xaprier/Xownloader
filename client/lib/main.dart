@@ -2,18 +2,25 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config/app_config.dart';
 import 'models/download_job.dart';
 import 'models/media_preview.dart';
 import 'services/download_api.dart';
 import 'services/share_intent_service.dart';
+import 'services/theme_controller.dart';
+import 'theme/app_theme.dart';
+import 'widgets/result_actions.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env', isOptional: true);
+  final themeController = ThemeController(await SharedPreferences.getInstance());
+  await themeController.load();
   runApp(
     MyApp(
+      themeController: themeController,
       api: DownloadApi(
         baseUrl: AppConfig.serverUrl,
         token: AppConfig.clientApiToken,
@@ -23,36 +30,84 @@ Future<void> main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key, this.api});
+  const MyApp({required this.themeController, super.key, this.api});
 
+  final ThemeController themeController;
   final DownloadApi? api;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Xownloader',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
+    return ListenableBuilder(
+      listenable: themeController,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'Xownloader',
+          theme: lightTheme,
+          darkTheme: darkTheme,
+          themeMode: themeController.mode,
+          home: DownloadPage(
+            themeController: themeController,
+            api:
+                api ??
+                DownloadApi(
+                  baseUrl: AppConfig.serverUrl,
+                  token: AppConfig.clientApiToken,
+                ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// AppBar control that cycles through and selects the app [ThemeMode].
+class ThemeModeMenu extends StatelessWidget {
+  const ThemeModeMenu({required this.controller, super.key});
+
+  final ThemeController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<ThemeMode>(
+      key: const Key('theme-menu'),
+      icon: Icon(switch (controller.mode) {
+        ThemeMode.system => Icons.brightness_auto,
+        ThemeMode.light => Icons.light_mode,
+        ThemeMode.dark => Icons.dark_mode,
+      }),
+      tooltip: 'Theme',
+      initialValue: controller.mode,
+      onSelected: controller.setMode,
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          value: ThemeMode.system,
+          child: ListTile(
+            leading: Icon(Icons.brightness_auto),
+            title: Text('System'),
+          ),
         ),
-      ),
-      home: DownloadPage(
-        api:
-            api ??
-            DownloadApi(
-              baseUrl: AppConfig.serverUrl,
-              token: AppConfig.clientApiToken,
-            ),
-      ),
+        PopupMenuItem(
+          value: ThemeMode.light,
+          child: ListTile(leading: Icon(Icons.light_mode), title: Text('Light')),
+        ),
+        PopupMenuItem(
+          value: ThemeMode.dark,
+          child: ListTile(leading: Icon(Icons.dark_mode), title: Text('Dark')),
+        ),
+      ],
     );
   }
 }
 
 class DownloadPage extends StatefulWidget {
-  const DownloadPage({required this.api, super.key});
+  const DownloadPage({
+    required this.api,
+    required this.themeController,
+    super.key,
+  });
 
   final DownloadApi api;
+  final ThemeController themeController;
 
   @override
   State<DownloadPage> createState() => _DownloadPageState();
@@ -192,7 +247,10 @@ class _DownloadPageState extends State<DownloadPage> {
   Widget build(BuildContext context) {
     final job = _job;
     return Scaffold(
-      appBar: AppBar(title: const Text('Xownloader')),
+      appBar: AppBar(
+        title: const Text('Xownloader'),
+        actions: [ThemeModeMenu(controller: widget.themeController)],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
@@ -216,7 +274,9 @@ class _DownloadPageState extends State<DownloadPage> {
               if (_preview == null)
                 FilledButton.icon(
                   onPressed: _submitting ? null : _inspectUrl,
-                  icon: const Icon(Icons.search),
+                  icon: _submitting
+                      ? const _ButtonSpinner()
+                      : const Icon(Icons.search),
                   label: Text(_submitting ? 'Inspecting...' : 'Inspect URL'),
                 )
               else ...[
@@ -276,16 +336,15 @@ class _DownloadPageState extends State<DownloadPage> {
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: _submitting ? null : _startDownload,
-                  icon: const Icon(Icons.download),
+                  icon: _submitting
+                      ? const _ButtonSpinner()
+                      : const Icon(Icons.download),
                   label: Text(_submitting ? 'Submitting...' : 'Start download'),
                 ),
               ],
               if (_error != null) ...[
                 const SizedBox(height: 16),
-                Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
+                _ErrorBanner(message: _error!),
               ],
               if (job != null) ...[
                 const SizedBox(height: 24),
@@ -320,6 +379,20 @@ class _PreviewCard extends StatelessWidget {
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return const Icon(Icons.broken_image);
+                },
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return const SizedBox(
+                    width: 96,
+                    height: 54,
+                    child: Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  );
                 },
               ),
         title: Text(preview.title),
@@ -375,11 +448,60 @@ class _JobStatusCard extends StatelessWidget {
                 ),
               ),
             ],
-            if (job.error != null) Text(job.error!),
-            if (job.status == DownloadStatus.completed)
-              SelectableText('File: ${api.fileUri(job.id)}'),
+            if (job.error != null) ...[
+              const SizedBox(height: 8),
+              _ErrorBanner(message: job.error!),
+            ],
+            if (job.status == DownloadStatus.completed) ...[
+              const SizedBox(height: 8),
+              ResultActions(fileUri: api.fileUri(job.id)),
+            ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ButtonSpinner extends StatelessWidget {
+  const _ButtonSpinner();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 18,
+      height: 18,
+      child: CircularProgressIndicator(strokeWidth: 2),
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.errorContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline, color: scheme.onErrorContainer, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: scheme.onErrorContainer),
+            ),
+          ),
+        ],
       ),
     );
   }
