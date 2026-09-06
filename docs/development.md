@@ -37,6 +37,13 @@ The client theme (System/Light/Dark) is a local per-device preference stored wit
 changing the brand art with `dart run flutter_launcher_icons` (config in
 `client/flutter_launcher_icons.yaml`).
 
+The client can run several downloads at once — the Active tab holds the new-download
+composer and running jobs, the Done tab holds finished ones. Job history is per-session
+and not persisted. Completed files are served from unauthenticated capability URLs
+(`/api/v1/downloads/{id}/file` and `/file/{name}`); the unguessable job id plus retention
+expiry are the guard, and the trailing name segment lets browsers and download managers
+save the file under the original video title.
+
 ### Platform notes
 
 - Cleartext HTTP is blocked by default on Android and iOS. It is permitted only for
