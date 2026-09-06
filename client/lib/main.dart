@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -129,10 +130,13 @@ class _DownloadPageState extends State<DownloadPage> {
   @override
   void initState() {
     super.initState();
-    _consumeInitialShare();
-    _shareSubscription = const ShareIntentService().urlStream().listen(
-      _applySharedUrl,
-    );
+    // The share-intent plugin has no web implementation.
+    if (!kIsWeb) {
+      _consumeInitialShare();
+      _shareSubscription = const ShareIntentService().urlStream().listen(
+        _applySharedUrl,
+      );
+    }
   }
 
   @override
@@ -441,6 +445,9 @@ class _PreviewCard extends StatelessWidget {
                 preview.thumbnail!,
                 width: 96,
                 fit: BoxFit.cover,
+                // Provider thumbnail hosts send no CORS headers, so the CanvasKit
+                // web renderer cannot read the bytes. Fall back to an <img> element.
+                webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
                 errorBuilder: (context, error, stackTrace) {
                   return const Icon(Icons.broken_image);
                 },
