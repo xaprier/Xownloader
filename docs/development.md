@@ -35,5 +35,8 @@ flutter build linux
 For web development, add the browser origin to `XOWNLOADER_CORS_ALLOWED_ORIGINS` in the
 server `.env`. Do not use a wildcard CORS origin in a deployed environment.
 
+For a production-like local run, set both `XOWNLOADER_CLIENT_API_TOKEN` and
+`XOWNLOADER_ADMIN_API_TOKEN`; all protected API routes then require a Bearer token.
+
 Keep local output in ignored directories. Do not use live provider downloads in automated
 tests.

@@ -32,6 +32,8 @@ adapters must not own HTTP routes, client state, or retention policy.
    rather than silently disappearing.
 - The provider adapter reports progress to the job manager; operational endpoints expose
    liveness, readiness, and counters without exposing provider internals to clients.
+- Access control uses instance API tokens rather than user accounts: client scope is for
+   download operations, while admin scope is required for all-job and operational views.
 
 ## Operational boundaries
 

@@ -1,12 +1,14 @@
 import asyncio
+import shutil
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 
 from xownloader_server import __version__
+from xownloader_server.auth import AuthService, require_admin_scope, require_client_scope
 from xownloader_server.config import settings
 from xownloader_server.errors import (
     InsufficientStorage,
@@ -31,6 +33,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Content-Type"],
 )
+app.state.auth = AuthService(settings)
 
 
 async def _cleanup_loop() -> None:
@@ -65,13 +68,35 @@ def readiness() -> dict[str, object]:
 
 
 @app.get("/metrics", response_class=PlainTextResponse, tags=["system"])
-def metrics() -> PlainTextResponse:
+def metrics(_: None = Depends(require_admin_scope)) -> PlainTextResponse:
     return PlainTextResponse(job_manager.metrics.prometheus())
 
 
 @app.get("/api/v1/downloads", response_model=list[DownloadJob], tags=["downloads"])
-def list_downloads() -> list[DownloadJob]:
+def list_downloads(_: None = Depends(require_admin_scope)) -> list[DownloadJob]:
     return job_manager.list_jobs()
+
+
+@app.get("/api/v1/admin/jobs", response_model=list[DownloadJob], tags=["admin"])
+def admin_jobs(_: None = Depends(require_admin_scope)) -> list[DownloadJob]:
+    return job_manager.list_jobs()
+
+
+@app.get("/api/v1/admin/status", tags=["admin"])
+def admin_status(_: None = Depends(require_admin_scope)) -> dict[str, object]:
+    jobs = job_manager.list_jobs()
+    disk = shutil.disk_usage(settings.download_directory)
+    return {
+        "runtime": check_runtime(settings),
+        "jobs": {
+            "total": len(jobs),
+            "queued": sum(job.status.value == "queued" for job in jobs),
+            "downloading": sum(job.status.value == "downloading" for job in jobs),
+            "completed": sum(job.status.value == "completed" for job in jobs),
+            "failed": sum(job.status.value == "failed" for job in jobs),
+        },
+        "storage": {"free_bytes": disk.free, "total_bytes": disk.total},
+    }
 
 
 @app.post(
@@ -80,7 +105,11 @@ def list_downloads() -> list[DownloadJob]:
     status_code=status.HTTP_202_ACCEPTED,
     tags=["downloads"],
 )
-async def create_download(request: Request, payload: DownloadRequest) -> DownloadJob:
+async def create_download(
+    request: Request,
+    payload: DownloadRequest,
+    _: None = Depends(require_client_scope),
+) -> DownloadJob:
     client_key = request.client.host if request.client else "unknown"
     try:
         return await job_manager.create_job(payload, client_key)
@@ -102,7 +131,7 @@ async def create_download(request: Request, payload: DownloadRequest) -> Downloa
 
 
 @app.get("/api/v1/downloads/{job_id}", response_model=DownloadJob, tags=["downloads"])
-def get_download(job_id: UUID) -> DownloadJob:
+def get_download(job_id: UUID, _: None = Depends(require_client_scope)) -> DownloadJob:
     try:
         return job_manager.get_job(job_id)
     except JobNotFound as error:
@@ -113,7 +142,10 @@ def get_download(job_id: UUID) -> DownloadJob:
 
 
 @app.delete("/api/v1/downloads/{job_id}", response_model=DownloadJob, tags=["downloads"])
-async def cancel_download(job_id: UUID) -> DownloadJob:
+async def cancel_download(
+    job_id: UUID,
+    _: None = Depends(require_client_scope),
+) -> DownloadJob:
     try:
         return await job_manager.cancel_job(job_id)
     except JobNotFound as error:
@@ -124,7 +156,7 @@ async def cancel_download(job_id: UUID) -> DownloadJob:
 
 
 @app.get("/api/v1/downloads/{job_id}/file", response_class=FileResponse, tags=["downloads"])
-def download_file(job_id: UUID) -> FileResponse:
+def download_file(job_id: UUID, _: None = Depends(require_client_scope)) -> FileResponse:
     try:
         job = job_manager.get_job(job_id)
     except JobNotFound as error:

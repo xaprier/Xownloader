@@ -1,11 +1,13 @@
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     environment: str = "development"
+    client_api_token: SecretStr | None = None
+    admin_api_token: SecretStr | None = None
     host: str = "127.0.0.1"
     port: int = 8000
     download_directory: Path = Path("./data/downloads")

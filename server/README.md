@@ -14,6 +14,15 @@ adapters keep future integrations such as Instagram outside the shared API model
 - `GET /api/v1/downloads/{id}` returns job status, progress, and retention metadata.
 - `DELETE /api/v1/downloads/{id}` cancels a queued or active job.
 - `GET /api/v1/downloads/{id}/file` returns a completed file.
+- `GET /api/v1/admin/jobs` lists all jobs for administrators.
+- `GET /api/v1/admin/status` exposes runtime, queue, and storage status for administrators.
+
+## Access control
+
+There is no end-user login in the initial design. In development, an unset token keeps
+local use simple. In production, clients must send `Authorization: Bearer <client-token>`
+and administrators must use the separate `XOWNLOADER_ADMIN_API_TOKEN`. The admin token
+also has client scope; the client token cannot access admin endpoints.
 
 The API enforces a configurable request rate limit, queue size, concurrent download
 count, output format and bitrate/quality allowlist, maximum file size, and minimum free
