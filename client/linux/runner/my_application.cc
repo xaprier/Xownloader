@@ -19,6 +19,35 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
 }
 
+// Sets the window (and taskbar) icon. When the app is installed the desktop
+// environment resolves the icon from the hicolor theme via the application ID;
+// when running from the relocatable bundle we load the packaged PNG directly.
+static void apply_window_icon(GtkWindow* window) {
+  gtk_window_set_default_icon_name(APPLICATION_ID);
+
+  g_autoptr(GError) link_error = nullptr;
+  g_autofree gchar* exe_path =
+      g_file_read_link("/proc/self/exe", &link_error);
+  if (exe_path == nullptr) {
+    g_warning("Could not resolve executable path for window icon: %s",
+              link_error->message);
+    return;
+  }
+
+  g_autofree gchar* exe_dir = g_path_get_dirname(exe_path);
+  g_autofree gchar* icon_path =
+      g_build_filename(exe_dir, "data", "app_icon.png", nullptr);
+  if (!g_file_test(icon_path, G_FILE_TEST_EXISTS)) {
+    return;
+  }
+
+  g_autoptr(GError) icon_error = nullptr;
+  if (!gtk_window_set_icon_from_file(window, icon_path, &icon_error)) {
+    g_warning("Failed to load window icon '%s': %s", icon_path,
+              icon_error->message);
+  }
+}
+
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
@@ -45,12 +74,14 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "xownloader");
+    gtk_header_bar_set_title(header_bar, "Xownloader");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "xownloader");
+    gtk_window_set_title(window, "Xownloader");
   }
+
+  apply_window_icon(window);
 
   gtk_window_set_default_size(window, 1280, 720);
 
