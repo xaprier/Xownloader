@@ -15,8 +15,10 @@ adapters keep future integrations such as Instagram outside the shared API model
 
 The API enforces a configurable request rate limit, queue size, concurrent download
 count, output format and bitrate/quality allowlist, maximum file size, and minimum free
-disk space. Completed files receive an expiration time and a server cleanup task removes
-them after the configured retention period.
+disk space. Job metadata is stored in SQLite at `XOWNLOADER_DATABASE_PATH`, so status and
+retention metadata survive a server restart. Interrupted active jobs are marked failed
+for explicit client recovery. Completed files receive an expiration time and a server
+cleanup task removes them after the configured retention period.
 
 ```bash
 uv sync

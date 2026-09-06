@@ -28,6 +28,8 @@ adapters must not own HTTP routes, client state, or retention policy.
 - A completed file cannot exceed the configured maximum size and receives an expiration time.
 - Cleanup runs periodically and removes expired files; clients never decide retention.
 - Provider adapters are the only layer allowed to know how a provider is downloaded.
+- Job metadata is persisted in SQLite; interrupted jobs are marked failed during startup
+   rather than silently disappearing.
 
 ## Operational boundaries
 

@@ -83,9 +83,9 @@ branches with reviewed merges for repository contributions.
 ## Development status
 
 The repository currently contains the initial monorepo structure, a policy-controlled
-REST API foundation, and a generated Flutter client starter. The next implementation
-slice is durable job storage, authentication, progress reporting, and client integration.
-Tests and client features should be added with each slice.
+REST API foundation with SQLite job persistence, and a generated Flutter client starter.
+The next implementation slice is authentication, progress reporting, and client
+integration. Tests and client features should be added with each slice.
 
 ## License
 

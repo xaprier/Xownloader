@@ -21,6 +21,7 @@ class FakeAdapter:
 async def test_job_manager_completes_and_sets_retention(tmp_path: Path) -> None:
     settings = Settings(
         download_directory=tmp_path,
+        database_path=tmp_path / "jobs.db",
         min_free_disk_mb=0,
         retention_hours=12,
         max_file_size_mb=1,
@@ -36,6 +37,11 @@ async def test_job_manager_completes_and_sets_retention(tmp_path: Path) -> None:
     assert completed_job.status == JobStatus.COMPLETED
     assert completed_job.file_size_bytes == len(b"test media")
     assert completed_job.expires_at is not None
+
+    restarted_manager = JobManager(settings, adapter=FakeAdapter())
+    persisted_job = restarted_manager.get_job(job.id)
+    assert persisted_job.status == JobStatus.COMPLETED
+    assert persisted_job.file_name == completed_job.file_name
 
     removed = manager.cleanup_expired(completed_job.expires_at)
     assert removed == 1

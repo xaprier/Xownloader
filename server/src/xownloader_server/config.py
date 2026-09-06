@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
     download_directory: Path = Path("./data/downloads")
+    database_path: Path = Path("./data/xownloader.db")
     retention_hours: int = Field(default=24, gt=0)
     max_concurrent_downloads: int = Field(default=2, gt=0)
     max_queue_size: int = Field(default=50, gt=0)
