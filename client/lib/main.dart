@@ -7,6 +7,7 @@ import 'config/app_config.dart';
 import 'models/download_job.dart';
 import 'models/media_preview.dart';
 import 'services/download_api.dart';
+import 'services/share_intent_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,6 +63,7 @@ class _DownloadPageState extends State<DownloadPage> {
   MediaPreview? _preview;
   DownloadJob? _job;
   Timer? _pollTimer;
+  StreamSubscription<String>? _shareSubscription;
   String _format = 'mp4';
   String? _quality;
   String? _audioBitrate;
@@ -69,8 +71,18 @@ class _DownloadPageState extends State<DownloadPage> {
   bool _submitting = false;
 
   @override
+  void initState() {
+    super.initState();
+    _consumeInitialShare();
+    _shareSubscription = const ShareIntentService().urlStream().listen(
+      _applySharedUrl,
+    );
+  }
+
+  @override
   void dispose() {
     _pollTimer?.cancel();
+    _shareSubscription?.cancel();
     _urlController.dispose();
     super.dispose();
   }
@@ -99,6 +111,17 @@ class _DownloadPageState extends State<DownloadPage> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  Future<void> _consumeInitialShare() async {
+    final url = await const ShareIntentService().initialUrl();
+    if (url != null && mounted) _applySharedUrl(url);
+  }
+
+  void _applySharedUrl(String url) {
+    _urlController.text = url;
+    _urlController.selection = TextSelection.collapsed(offset: url.length);
+    _inspectUrl();
   }
 
   Future<void> _startDownload() async {
