@@ -31,25 +31,21 @@ class ResultActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
       children: [
-        SelectableText('File: $fileUri'),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: [
-            OutlinedButton.icon(
-              onPressed: () => _copy(context),
-              icon: const Icon(Icons.copy),
-              label: const Text('Copy link'),
-            ),
-            FilledButton.icon(
-              onPressed: () => _open(context),
-              icon: const Icon(Icons.open_in_new),
-              label: const Text('Open'),
-            ),
-          ],
+        OutlinedButton.icon(
+          onPressed: () => _copy(context),
+          style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+          icon: const Icon(Icons.link, size: 16),
+          label: const Text('Copy link'),
+        ),
+        FilledButton.icon(
+          onPressed: () => _open(context),
+          style: FilledButton.styleFrom(visualDensity: VisualDensity.compact),
+          icon: const Icon(Icons.open_in_new, size: 16),
+          label: const Text('Open'),
         ),
       ],
     );

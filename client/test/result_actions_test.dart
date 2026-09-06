@@ -10,10 +10,12 @@ void main() {
         home: Scaffold(body: ResultActions(fileUri: fileUri)),
       );
 
-  testWidgets('shows the file URL', (tester) async {
+  testWidgets('offers copy and open actions', (tester) async {
     await tester.pumpWidget(host());
 
-    expect(find.text('File: $fileUri'), findsOneWidget);
+    expect(find.text('Copy link'), findsOneWidget);
+    expect(find.text('Open'), findsOneWidget);
+    expect(find.textContaining('File:'), findsNothing);
   });
 
   testWidgets('copy button writes the file URL to the clipboard',

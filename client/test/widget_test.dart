@@ -123,8 +123,7 @@ void main() {
     expect(_appThemeMode(tester), ThemeMode.dark);
   });
 
-  testWidgets('queues each inspected URL as its own job and clears the composer',
-      (tester) async {
+  testWidgets('queues each inspected URL under its media title', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final api = DownloadApi(baseUrl: 'http://x', client: _QueueFakeClient());
     await tester.pumpWidget(
@@ -134,15 +133,17 @@ void main() {
     await _inspectAndQueue(tester, 'https://youtu.be/a');
     await _inspectAndQueue(tester, 'https://youtu.be/b');
 
-    expect(find.text('Job job-1'), findsOneWidget);
-    expect(find.text('Job job-2'), findsOneWidget);
+    // both cards show the preview title, not the job id
+    expect(find.text('Example video'), findsNWidgets(2));
+    expect(find.textContaining('job-'), findsNothing);
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.controller!.text, '');
 
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('completed jobs move to the Done tab', (tester) async {
+  testWidgets('active and completed downloads render on the same page',
+      (tester) async {
     SharedPreferences.setMockInitialValues({});
     final api = DownloadApi(
       baseUrl: 'http://x',
@@ -156,11 +157,11 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.pump(const Duration(milliseconds: 20));
 
-    expect(find.text('Job job-1'), findsNothing); // not on Active
-
-    await tester.tap(find.text('Done'));
-    await tester.pumpAndSettle();
-    expect(find.text('Job job-1'), findsOneWidget);
+    // no tabs anymore
+    expect(find.text('Done'), findsNothing);
+    // completed card: server display name + a COMPLETED badge + copy action
+    expect(find.text('Example video.mp4'), findsOneWidget);
+    expect(find.text('COMPLETED'), findsOneWidget);
     expect(find.text('Copy link'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
