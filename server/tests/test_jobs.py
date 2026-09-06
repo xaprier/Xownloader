@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,20 @@ class FakeAdapter:
         await progress_callback(25)
         output_path = output_directory / f"{job.id}.mp4"
         output_directory.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"test media")
+        await progress_callback(100)
+        return output_path
+
+
+class InfoJsonAdapter:
+    name = "youtube"
+
+    async def download(self, job, output_directory: Path, progress_callback) -> Path:
+        output_directory.mkdir(parents=True, exist_ok=True)
+        (output_directory / f"{job.id}.info.json").write_text(
+            json.dumps({"title": "My Great Video"})
+        )
+        output_path = output_directory / f"{job.id}.mp4"
         output_path.write_bytes(b"test media")
         await progress_callback(100)
         return output_path
@@ -49,3 +64,50 @@ async def test_job_manager_completes_and_sets_retention(tmp_path: Path) -> None:
     removed = manager.cleanup_expired(completed_job.expires_at)
     assert removed == 1
     assert completed_job.file_path is None
+
+
+@pytest.mark.asyncio
+async def test_job_manager_records_title_and_removes_info_json(tmp_path: Path) -> None:
+    settings = Settings(
+        download_directory=tmp_path,
+        database_path=tmp_path / "jobs.db",
+        min_free_disk_mb=0,
+        retention_hours=12,
+        max_file_size_mb=1,
+    )
+    manager = JobManager(settings, adapter=InfoJsonAdapter())
+    job = await manager.create_job(
+        DownloadRequest.model_validate({"source_url": "https://youtu.be/example"}),
+        client_key="test-client",
+    )
+    await manager._tasks[job.id]
+
+    completed = manager.get_job(job.id)
+    assert completed.title == "My Great Video"
+    assert completed.display_name == "My Great Video.mp4"
+    assert not (tmp_path / f"{job.id}.info.json").exists()
+    manager.close()
+
+
+@pytest.mark.asyncio
+async def test_job_manager_display_name_falls_back_without_info_json(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        download_directory=tmp_path,
+        database_path=tmp_path / "jobs.db",
+        min_free_disk_mb=0,
+        retention_hours=12,
+        max_file_size_mb=1,
+    )
+    manager = JobManager(settings, adapter=FakeAdapter())
+    job = await manager.create_job(
+        DownloadRequest.model_validate({"source_url": "https://youtu.be/example"}),
+        client_key="test-client",
+    )
+    await manager._tasks[job.id]
+
+    completed = manager.get_job(job.id)
+    assert completed.title is None
+    assert completed.display_name == completed.file_name
+    manager.close()
