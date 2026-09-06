@@ -22,6 +22,16 @@ server-approved options without creating a job. The user then selects MP4/MP3, v
 quality, and audio bitrate before explicitly starting the download. Progress polling,
 error display, cancellation, and the completed file URL are supported after submission.
 
+## Share intent
+
+Android is configured to receive `text/plain` shares from YouTube and other apps. A
+shared HTTP(S) URL is placed into the URL field and inspected automatically; downloading
+still requires explicit confirmation in the preview screen.
+
+iOS requires a native Share Extension target because Flutter Runner alone cannot appear
+as a share destination. The required Xcode setup is documented in
+`ios/Share Extension/README.md`.
+
 Install the Flutter stable channel, then run:
 
 ```bash

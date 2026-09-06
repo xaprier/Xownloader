@@ -39,10 +39,7 @@ void main() {
     );
 
     expect(job.status, DownloadStatus.queued);
-    expect(
-      client.lastRequest?.url.toString(),
-      'http://localhost:8000/api/v1/downloads',
-    );
+    expect(client.lastRequest?.url.toString(), 'http://localhost:8000/api/v1/downloads');
     expect(client.lastRequest?.headers['authorization'], 'Bearer client-token');
     final request = client.lastRequest! as http.Request;
     expect(jsonDecode(request.body), {
@@ -51,6 +48,21 @@ void main() {
       'video_quality': '720p',
       'audio_bitrate': '192K',
     });
+  });
+
+  test('previews a URL before creating a download', () async {
+    final client = FakeHttpClient(_previewJson);
+    final api = DownloadApi(
+      baseUrl: 'http://localhost:8000/',
+      token: 'client-token',
+      client: client,
+    );
+
+    final preview = await api.preview('https://youtu.be/example');
+
+    expect(preview.title, 'Example video');
+    expect(client.lastRequest?.url.toString(), 'http://localhost:8000/api/v1/previews');
+    expect(client.lastRequest?.headers['authorization'], 'Bearer client-token');
   });
 }
 
@@ -61,5 +73,19 @@ const _jobJson = '''
   "output_format": "mp4",
   "status": "queued",
   "progress_percent": 0
+}
+''';
+
+const _previewJson = '''
+{
+  "source_url": "https://youtu.be/example",
+  "provider": "youtube",
+  "title": "Example video",
+  "thumbnail": null,
+  "uploader": "Example channel",
+  "duration_seconds": 123,
+  "allowed_output_formats": ["mp4", "mp3"],
+  "allowed_video_qualities": ["480p", "720p"],
+  "allowed_audio_bitrates": ["128K", "192K"]
 }
 ''';
