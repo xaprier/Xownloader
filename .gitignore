@@ -38,3 +38,8 @@ Thumbs.db
 # Local agent memory
 memory-bank/
 AGENTS.md
+
+# Local update server scripts
+Makefile
+update_server.sh
+update_web.sh
