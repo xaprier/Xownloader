@@ -11,6 +11,7 @@ import 'services/download_api.dart';
 import 'services/share_intent_service.dart';
 import 'services/theme_controller.dart';
 import 'theme/app_theme.dart';
+import 'utils/duration_format.dart';
 import 'widgets/result_actions.dart';
 
 Future<void> main() async {
@@ -399,7 +400,8 @@ class _PreviewCard extends StatelessWidget {
         subtitle: Text(
           [
             if (preview.uploader != null) preview.uploader!,
-            if (preview.durationSeconds != null) '${preview.durationSeconds}s',
+            if (preview.durationSeconds != null)
+              formatDuration(preview.durationSeconds),
           ].join(' - '),
         ),
       ),
