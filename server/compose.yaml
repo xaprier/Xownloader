@@ -22,10 +22,15 @@ services:
       XOWNLOADER_DOWNLOAD_DIRECTORY: /data/downloads
       XOWNLOADER_DATABASE_PATH: /data/xownloader.db
       HOME: /tmp
+      # Trust X-Forwarded-For only from the reverse proxy hop (this network's
+      # gateway). A direct client cannot spoof its rate-limit identity.
+      FORWARDED_ALLOW_IPS: "172.28.0.1"
     volumes:
       # Downloads and the SQLite database live on the host for backup/inspection.
       - ./data:/data
     restart: unless-stopped
+    networks:
+      - proxy
     healthcheck:
       test:
         - CMD
@@ -36,3 +41,11 @@ services:
       timeout: 5s
       start_period: 10s
       retries: 3
+
+networks:
+  proxy:
+    ipam:
+      config:
+        # Fixed subnet so FORWARDED_ALLOW_IPS above matches the gateway address
+        # the reverse proxy connects from.
+        - subnet: 172.28.0.0/24
