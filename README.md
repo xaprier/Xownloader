@@ -76,7 +76,8 @@ allowed media policy, and retention period are server-owned settings. Downloaded
 files must be treated as temporary data and cleaned by the server according to that
 policy rather than by either client.
 
-See [docs/architecture.md](docs/architecture.md) for the system architecture. Keep
+See [docs/architecture.md](docs/architecture.md) and [docs/operations.md](docs/operations.md)
+for architecture and production operations. Keep
 changes focused, validate them with the relevant tests and linters, and use dedicated
 branches with reviewed merges for repository contributions.
 

@@ -40,3 +40,6 @@ For a production-like local run, set both `XOWNLOADER_CLIENT_API_TOKEN` and
 
 Keep local output in ignored directories. Do not use live provider downloads in automated
 tests.
+
+See [operations.md](operations.md) for production configuration, readiness, backups, and
+incident checks.

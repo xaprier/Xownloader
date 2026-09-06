@@ -10,7 +10,7 @@ adapters keep future integrations such as Instagram outside the shared API model
 - `GET /ready` checks runtime dependencies, output storage, and disk reserve.
 - `GET /metrics` exposes basic Prometheus-compatible job counters.
 - `POST /api/v1/downloads` validates a YouTube request and queues a job.
-- `GET /api/v1/downloads` lists in-memory job state.
+- `GET /api/v1/downloads` lists persisted job state.
 - `GET /api/v1/downloads/{id}` returns job status, progress, and retention metadata.
 - `DELETE /api/v1/downloads/{id}` cancels a queued or active job.
 - `GET /api/v1/downloads/{id}/file` returns a completed file.
