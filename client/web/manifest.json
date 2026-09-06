@@ -1,11 +1,11 @@
 {
-    "name": "xownloader",
-    "short_name": "xownloader",
+    "name": "Xownloader",
+    "short_name": "Xownloader",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0D0C0D",
+    "theme_color": "#F5721E",
+    "description": "Self-hosted media downloader client.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

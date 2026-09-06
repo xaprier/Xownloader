@@ -1,0 +1,33 @@
+# App launcher icons for every Flutter target.
+# Regenerate after changing the source art:
+#   dart run flutter_launcher_icons
+#
+# Sources live in assets/icon/:
+#   icon.png            full-bleed mark on the brand dark background (#0D0C0D)
+#   icon_foreground.png transparent mark for the Android adaptive foreground layer
+flutter_launcher_icons:
+  image_path: "assets/icon/icon.png"
+
+  android: "ic_launcher"
+  min_sdk_android: 21
+  adaptive_icon_background: "#0D0C0D"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+
+  ios: true
+  remove_alpha_ios: true
+  background_color_ios: "#0D0C0D"
+
+  web:
+    generate: true
+    image_path: "assets/icon/icon.png"
+    background_color: "#0D0C0D"
+    theme_color: "#F5721E"
+
+  windows:
+    generate: true
+    image_path: "assets/icon/icon.png"
+    icon_size: 256
+
+  macos:
+    generate: true
+    image_path: "assets/icon/icon.png"
