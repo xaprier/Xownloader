@@ -1,3 +1,7 @@
+# "version" is obsolete for Docker Compose v2 (harmless warning) but keeps the
+# file parseable by the legacy docker-compose v1 still on some servers.
+version: "3.8"
+
 services:
   server:
     build:
@@ -8,11 +12,10 @@ services:
       # forwards to this. Set XOWNLOADER_HOST_PORT in .env to pick the host port
       # (e.g. when 8000 is taken); the reverse proxy must match it.
       - "127.0.0.1:${XOWNLOADER_HOST_PORT:-8000}:8000"
-    # Optional: provide deployment values (tokens, CORS, policy limits).
-    # Copy .env.example to .env to use it; runs on image defaults when absent.
+    # Deployment values (tokens, CORS, policy limits). Copy .env.example to .env
+    # before the first run — this file must exist.
     env_file:
-      - path: .env
-        required: false
+      - .env
     # Run as the host user that owns ./data so the bind-mounted downloads and
     # SQLite database are writable. Override for a different owner:
     #   XOWNLOADER_UID=$(id -u) XOWNLOADER_GID=$(id -g) docker compose up -d
