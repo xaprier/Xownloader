@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -115,9 +116,33 @@ class DownloadPage extends StatefulWidget {
   State<DownloadPage> createState() => _DownloadPageState();
 }
 
+/// A download job paired with the media title we already knew when it was
+/// queued. The server only fills in the title once the job completes, so this
+/// keeps the card readable from the moment it appears.
+class _QueuedJob {
+  const _QueuedJob(this.job, this.previewTitle);
+
+  final DownloadJob job;
+  final String? previewTitle;
+
+  _QueuedJob withJob(DownloadJob updated) => _QueuedJob(updated, previewTitle);
+
+  String get displayTitle =>
+      job.displayName ?? previewTitle ?? _shortSourceLabel(job.sourceUrl);
+}
+
+String _shortSourceLabel(String url) {
+  final uri = Uri.tryParse(url);
+  if (uri == null) return url;
+  final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+  final id = uri.queryParameters['v'] ??
+      (segments.isNotEmpty ? segments.last : null);
+  return id == null || id.isEmpty ? url : '$id · ${uri.host}';
+}
+
 class _DownloadPageState extends State<DownloadPage> {
   final _urlController = TextEditingController();
-  final List<DownloadJob> _jobs = [];
+  final List<_QueuedJob> _jobs = [];
   MediaPreview? _preview;
   Timer? _pollTimer;
   StreamSubscription<String>? _shareSubscription;
@@ -130,8 +155,11 @@ class _DownloadPageState extends State<DownloadPage> {
   @override
   void initState() {
     super.initState();
-    // The share-intent plugin has no web implementation.
-    if (!kIsWeb) {
+    // Share intents only exist on mobile; the plugin has no desktop or web side.
+    final mobile = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
+    if (mobile) {
       _consumeInitialShare();
       _shareSubscription = const ShareIntentService().urlStream().listen(
         _applySharedUrl,
@@ -205,8 +233,9 @@ class _DownloadPageState extends State<DownloadPage> {
         audioBitrate: _audioBitrate,
       );
       if (!mounted) return;
+      final title = _preview?.title;
       setState(() {
-        _jobs.insert(0, job);
+        _jobs.insert(0, _QueuedJob(job, title));
         _preview = null;
         _quality = null;
         _audioBitrate = null;
@@ -233,20 +262,17 @@ class _DownloadPageState extends State<DownloadPage> {
   }
 
   Future<void> _refreshActive() async {
-    final active = _jobs.where(_isActive).toList();
+    final active = _jobs.where((entry) => _isActive(entry.job)).toList();
     if (active.isEmpty) {
       _pollTimer?.cancel();
       _pollTimer = null;
       return;
     }
-    for (final job in active) {
+    for (final entry in active) {
       try {
-        final fresh = await widget.api.getDownload(job.id);
+        final fresh = await widget.api.getDownload(entry.job.id);
         if (!mounted) return;
-        setState(() {
-          final index = _jobs.indexWhere((j) => j.id == fresh.id);
-          if (index != -1) _jobs[index] = fresh;
-        });
+        setState(() => _replaceJob(fresh));
       } on DownloadApiException catch (error) {
         if (mounted) setState(() => _error = error.message);
       }
@@ -257,82 +283,41 @@ class _DownloadPageState extends State<DownloadPage> {
     try {
       final cancelled = await widget.api.cancelDownload(job.id);
       if (!mounted) return;
-      setState(() {
-        final index = _jobs.indexWhere((j) => j.id == cancelled.id);
-        if (index != -1) _jobs[index] = cancelled;
-      });
+      setState(() => _replaceJob(cancelled));
     } on DownloadApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     }
   }
 
+  void _replaceJob(DownloadJob updated) {
+    final index = _jobs.indexWhere((entry) => entry.job.id == updated.id);
+    if (index != -1) _jobs[index] = _jobs[index].withJob(updated);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Xownloader'),
-          actions: [ThemeModeMenu(controller: widget.themeController)],
-          bottom: const TabBar(
-            tabs: [Tab(text: 'Active'), Tab(text: 'Done')],
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Xownloader'),
+        actions: [ThemeModeMenu(controller: widget.themeController)],
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              ..._buildComposer(context),
+              const SizedBox(height: 28),
+              _QueueSection(
+                jobs: _jobs,
+                api: widget.api,
+                onCancel: _cancel,
+              ),
+            ],
           ),
-        ),
-        body: TabBarView(
-          children: [_buildActiveTab(context), _buildDoneTab(context)],
         ),
       ),
-    );
-  }
-
-  Widget _tabShell({required List<Widget> children}) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720),
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: children,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActiveTab(BuildContext context) {
-    final active = _jobs.where(_isActive).toList();
-    return _tabShell(
-      children: [
-        ..._buildComposer(context),
-        for (final job in active) ...[
-          const SizedBox(height: 16),
-          _JobStatusCard(
-            job: job,
-            api: widget.api,
-            onCancel: () => _cancel(job),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildDoneTab(BuildContext context) {
-    final done = _jobs.where((job) => !_isActive(job)).toList();
-    if (done.isEmpty) {
-      return _tabShell(
-        children: const [
-          Padding(
-            padding: EdgeInsets.only(top: 48),
-            child: Center(child: Text('No finished downloads yet.')),
-          ),
-        ],
-      );
-    }
-    return _tabShell(
-      children: [
-        for (final job in done) ...[
-          _JobStatusCard(job: job, api: widget.api, onCancel: () => _cancel(job)),
-          const SizedBox(height: 16),
-        ],
-      ],
     );
   }
 
@@ -479,59 +464,327 @@ class _PreviewCard extends StatelessWidget {
   }
 }
 
-class _JobStatusCard extends StatelessWidget {
-  const _JobStatusCard({
-    required this.job,
+/// The list of downloads, grouped visually into one "queue" surface.
+class _QueueSection extends StatelessWidget {
+  const _QueueSection({
+    required this.jobs,
     required this.api,
     required this.onCancel,
   });
 
-  final DownloadJob job;
+  final List<_QueuedJob> jobs;
+  final DownloadApi api;
+  final void Function(DownloadJob) onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    if (jobs.isEmpty) {
+      return _EmptyQueueFrame(
+        child: Column(
+          children: [
+            Icon(Icons.inbox_outlined, color: scheme.onSurfaceVariant),
+            const SizedBox(height: 8),
+            Text(
+              'Your queue is empty',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Inspect a URL above to add the first download.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: 10),
+            child: Row(
+              children: [
+                Text(
+                  'QUEUE',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _CountPill(count: jobs.length),
+              ],
+            ),
+          ),
+          for (var i = 0; i < jobs.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            _JobCard(
+              entry: jobs[i],
+              api: api,
+              onCancel: () => onCancel(jobs[i].job),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CountPill extends StatelessWidget {
+  const _CountPill({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$count',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: scheme.primary,
+        ),
+      ),
+    );
+  }
+}
+
+({Color color, IconData icon, String label}) _statusStyle(
+  DownloadStatus status,
+  ColorScheme scheme,
+) {
+  return switch (status) {
+    DownloadStatus.queued => (
+      color: scheme.onSurfaceVariant,
+      icon: Icons.schedule,
+      label: 'QUEUED',
+    ),
+    DownloadStatus.downloading => (
+      color: const Color(0xFF3B82F6),
+      icon: Icons.download,
+      label: 'DOWNLOADING',
+    ),
+    DownloadStatus.completed => (
+      color: const Color(0xFF22C55E),
+      icon: Icons.check_circle,
+      label: 'COMPLETED',
+    ),
+    DownloadStatus.failed => (
+      color: scheme.error,
+      icon: Icons.error_outline,
+      label: 'FAILED',
+    ),
+    DownloadStatus.cancelled => (
+      color: scheme.outline,
+      icon: Icons.block,
+      label: 'CANCELLED',
+    ),
+  };
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.status});
+
+  final DownloadStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = _statusStyle(status, Theme.of(context).colorScheme);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: style.color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(style.icon, size: 13, color: style.color),
+          const SizedBox(width: 4),
+          Text(
+            style.label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: style.color,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JobCard extends StatelessWidget {
+  const _JobCard({required this.entry, required this.api, required this.onCancel});
+
+  final _QueuedJob entry;
   final DownloadApi api;
   final VoidCallback onCancel;
 
   @override
   Widget build(BuildContext context) {
-    final active =
-        job.status == DownloadStatus.queued ||
-        job.status == DownloadStatus.downloading;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final scheme = Theme.of(context).colorScheme;
+    final job = entry.job;
+    final style = _statusStyle(job.status, scheme);
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Job ${job.id}',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text('Status: ${job.status.name}'),
-            if (active) ...[
-              const SizedBox(height: 8),
-              LinearProgressIndicator(value: job.progressPercent / 100),
-              Text('${job.progressPercent.toStringAsFixed(1)}%'),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: onCancel,
-                  icon: const Icon(Icons.cancel_outlined),
-                  label: const Text('Cancel'),
+            Container(width: 4, color: style.color),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            entry.displayTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        _StatusBadge(status: job.status),
+                      ],
+                    ),
+                    ..._detail(context, job),
+                  ],
                 ),
               ),
-            ],
-            if (job.error != null) ...[
-              const SizedBox(height: 8),
-              _ErrorBanner(message: job.error!),
-            ],
-            if (job.status == DownloadStatus.completed) ...[
-              const SizedBox(height: 8),
-              ResultActions(
-                fileUri: api.fileUri(job.id, displayName: job.displayName),
-              ),
-            ],
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  List<Widget> _detail(BuildContext context, DownloadJob job) {
+    final scheme = Theme.of(context).colorScheme;
+    final muted = Theme.of(context).textTheme.bodySmall?.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
+
+    switch (job.status) {
+      case DownloadStatus.downloading:
+        return [
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: job.progressPercent / 100,
+              minHeight: 6,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Text('${job.progressPercent.toStringAsFixed(0)}%', style: muted),
+              const Spacer(),
+              _CancelButton(onCancel: onCancel),
+            ],
+          ),
+        ];
+      case DownloadStatus.queued:
+        return [
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: Text('Waiting for a free slot', style: muted)),
+              _CancelButton(onCancel: onCancel),
+            ],
+          ),
+        ];
+      case DownloadStatus.failed:
+        return [
+          const SizedBox(height: 10),
+          _ErrorBanner(message: job.error ?? 'The download failed.'),
+        ];
+      case DownloadStatus.cancelled:
+        return [
+          const SizedBox(height: 6),
+          Text('You cancelled this download.', style: muted),
+        ];
+      case DownloadStatus.completed:
+        return [
+          const SizedBox(height: 12),
+          ResultActions(
+            fileUri: api.fileUri(job.id, displayName: job.displayName),
+          ),
+        ];
+    }
+  }
+}
+
+class _CancelButton extends StatelessWidget {
+  const _CancelButton({required this.onCancel});
+
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: onCancel,
+      style: TextButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+      icon: const Icon(Icons.close, size: 16),
+      label: const Text('Cancel'),
+    );
+  }
+}
+
+/// A quiet outlined panel for the empty-queue placeholder.
+class _EmptyQueueFrame extends StatelessWidget {
+  const _EmptyQueueFrame({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+        child: Center(child: child),
       ),
     );
   }
