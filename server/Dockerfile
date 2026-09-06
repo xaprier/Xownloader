@@ -44,7 +44,9 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()" || exit 1
 
-# --proxy-headers + --forwarded-allow-ips let the app trust X-Forwarded-* from a
-# reverse proxy, so per-client rate limiting sees real client IPs. The container
-# is only reachable through that proxy (compose publishes to 127.0.0.1).
-CMD ["uvicorn", "xownloader_server.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# --proxy-headers makes the app read X-Forwarded-* so per-client rate limiting
+# sees real client IPs. Which upstream hops to trust is set per deployment via
+# the FORWARDED_ALLOW_IPS env var (see compose.yaml); the default is 127.0.0.1.
+# Never trust "*" here: any peer able to reach the port could then spoof
+# X-Forwarded-For and rotate past the rate limiter.
+CMD ["uvicorn", "xownloader_server.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
