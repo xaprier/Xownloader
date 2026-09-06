@@ -32,6 +32,11 @@ flutter build web
 flutter build linux
 ```
 
+The client theme (System/Light/Dark) is a local per-device preference stored with
+`shared_preferences`; it is not server configuration. Regenerate launcher icons after
+changing the brand art with `dart run flutter_launcher_icons` (config in
+`client/flutter_launcher_icons.yaml`).
+
 For web development, add the browser origin to `XOWNLOADER_CORS_ALLOWED_ORIGINS` in the
 server `.env`. Do not use a wildcard CORS origin in a deployed environment.
 
