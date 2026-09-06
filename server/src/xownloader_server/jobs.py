@@ -96,12 +96,19 @@ class JobManager:
                 try:
                     path.unlink()
                     removed += 1
-                except OSError:
+                except OSError as error:
+                    job.cleanup_attempts += 1
+                    job.last_cleanup_error = str(error)
+                    self.repository.save(job)
                     logger.exception("download_cleanup_failed", extra={"job_id": str(job.id)})
                     continue
             job.file_path = None
+            job.last_cleanup_error = None
             self.repository.save(job)
         return removed
+
+    def close(self) -> None:
+        self.repository.close()
 
     async def _run(self, job: DownloadJob) -> None:
         try:

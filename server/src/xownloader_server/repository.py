@@ -6,7 +6,7 @@ from uuid import UUID
 
 from xownloader_server.models import DownloadJob
 
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 
 
 class JobRepository:
@@ -22,9 +22,10 @@ class JobRepository:
             version = self._connection.execute("PRAGMA user_version").fetchone()[0]
             if version > CURRENT_SCHEMA_VERSION:
                 raise RuntimeError("Database schema is newer than this server version")
-            self._connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS jobs (
+            if version == 0:
+                self._connection.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS jobs (
                     id TEXT PRIMARY KEY,
                     source_url TEXT NOT NULL,
                     provider TEXT NOT NULL,
@@ -39,10 +40,17 @@ class JobRepository:
                     created_at TEXT NOT NULL,
                     completed_at TEXT,
                     expires_at TEXT,
-                    file_path TEXT
+                    file_path TEXT,
+                    cleanup_attempts INTEGER NOT NULL DEFAULT 0,
+                    last_cleanup_error TEXT
+                    )
+                    """
                 )
-                """
-            )
+            if version == 1:
+                self._connection.execute(
+                    "ALTER TABLE jobs ADD COLUMN cleanup_attempts INTEGER NOT NULL DEFAULT 0"
+                )
+                self._connection.execute("ALTER TABLE jobs ADD COLUMN last_cleanup_error TEXT")
             self._connection.execute(f"PRAGMA user_version = {CURRENT_SCHEMA_VERSION}")
 
     def save(self, job: DownloadJob) -> None:
@@ -62,6 +70,8 @@ class JobRepository:
             self._serialize_datetime(job.completed_at),
             self._serialize_datetime(job.expires_at),
             str(job.file_path) if job.file_path else None,
+            job.cleanup_attempts,
+            job.last_cleanup_error,
         )
         with self._lock, self._connection:
             self._connection.execute(
@@ -69,8 +79,8 @@ class JobRepository:
                 INSERT INTO jobs (
                     id, source_url, provider, output_format, video_quality, audio_bitrate,
                     status, progress_percent, error, file_name, file_size_bytes, created_at,
-                    completed_at, expires_at, file_path
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    completed_at, expires_at, file_path, cleanup_attempts, last_cleanup_error
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     status=excluded.status,
                     progress_percent=excluded.progress_percent,
@@ -79,7 +89,9 @@ class JobRepository:
                     file_size_bytes=excluded.file_size_bytes,
                     completed_at=excluded.completed_at,
                     expires_at=excluded.expires_at,
-                    file_path=excluded.file_path
+                    file_path=excluded.file_path,
+                    cleanup_attempts=excluded.cleanup_attempts,
+                    last_cleanup_error=excluded.last_cleanup_error
                 """,
                 values,
             )
@@ -97,6 +109,10 @@ class JobRepository:
                 "SELECT * FROM jobs ORDER BY created_at DESC"
             ).fetchall()
         return [self._from_row(row) for row in rows]
+
+    def close(self) -> None:
+        with self._lock:
+            self._connection.close()
 
     @staticmethod
     def _serialize_datetime(value: datetime | None) -> str | None:
@@ -121,5 +137,7 @@ class JobRepository:
                 "completed_at": row["completed_at"],
                 "expires_at": row["expires_at"],
                 "file_path": row["file_path"],
+                "cleanup_attempts": row["cleanup_attempts"],
+                "last_cleanup_error": row["last_cleanup_error"],
             }
         )

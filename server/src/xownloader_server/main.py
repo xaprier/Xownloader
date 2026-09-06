@@ -45,9 +45,12 @@ async def _cleanup_loop() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     cleanup_task = asyncio.create_task(_cleanup_loop())
-    yield
-    cleanup_task.cancel()
-    await asyncio.gather(cleanup_task, return_exceptions=True)
+    try:
+        yield
+    finally:
+        cleanup_task.cancel()
+        await asyncio.gather(cleanup_task, return_exceptions=True)
+        job_manager.close()
 
 
 job_manager = JobManager(settings)

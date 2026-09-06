@@ -34,6 +34,8 @@ adapters must not own HTTP routes, client state, or retention policy.
    liveness, readiness, and counters without exposing provider internals to clients.
 - Access control uses instance API tokens rather than user accounts: client scope is for
    download operations, while admin scope is required for all-job and operational views.
+- SQLite schema changes are versioned and cleanup failures remain persisted for a later
+   retry instead of being silently discarded.
 
 ## Operational boundaries
 
