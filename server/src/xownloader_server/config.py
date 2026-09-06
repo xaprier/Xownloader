@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     max_concurrent_downloads: int = Field(default=2, gt=0)
     max_queue_size: int = Field(default=50, gt=0)
     rate_limit_requests_per_minute: int = Field(default=10, gt=0)
+    preview_rate_limit_requests_per_minute: int = Field(default=30, gt=0)
     max_file_size_mb: int = Field(default=2048, gt=0)
     min_free_disk_mb: int = Field(default=1024, ge=0)
     cleanup_interval_minutes: int = Field(default=15, gt=0)

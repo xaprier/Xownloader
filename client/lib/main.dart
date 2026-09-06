@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'config/app_config.dart';
 import 'models/download_job.dart';
+import 'models/media_preview.dart';
 import 'services/download_api.dart';
 
 Future<void> main() async {
@@ -58,6 +59,7 @@ class DownloadPage extends StatefulWidget {
 
 class _DownloadPageState extends State<DownloadPage> {
   final _urlController = TextEditingController();
+  MediaPreview? _preview;
   DownloadJob? _job;
   Timer? _pollTimer;
   String _format = 'mp4';
@@ -73,10 +75,36 @@ class _DownloadPageState extends State<DownloadPage> {
     super.dispose();
   }
 
-  Future<void> _startDownload() async {
+  Future<void> _inspectUrl() async {
     final sourceUrl = _urlController.text.trim();
     if (sourceUrl.isEmpty) {
       setState(() => _error = 'Enter a YouTube URL.');
+      return;
+    }
+    setState(() {
+      _error = null;
+      _job = null;
+      _submitting = true;
+    });
+    try {
+      final preview = await widget.api.preview(sourceUrl);
+      if (!mounted) return;
+      setState(() => _preview = preview);
+    } on DownloadApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Could not reach the download server.');
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _startDownload() async {
+    final sourceUrl = _urlController.text.trim();
+    if (_preview == null) {
+      await _inspectUrl();
       return;
     }
     setState(() {
@@ -159,52 +187,76 @@ class _DownloadPageState extends State<DownloadPage> {
                 controller: _urlController,
                 keyboardType: TextInputType.url,
                 decoration: const InputDecoration(labelText: 'YouTube URL'),
-                onSubmitted: (_) => _startDownload(),
+                onSubmitted: (_) => _inspectUrl(),
               ),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                children: [
-                  DropdownButton<String>(
-                    value: _format,
-                    items: const [
-                      DropdownMenuItem(value: 'mp4', child: Text('MP4 video')),
-                      DropdownMenuItem(value: 'mp3', child: Text('MP3 audio')),
-                    ],
-                    onChanged: (value) => setState(() => _format = value!),
-                  ),
-                  DropdownButton<String?>(
-                    value: _quality,
-                    items: const [
-                      DropdownMenuItem(
-                        value: null,
-                        child: Text('Auto quality'),
-                      ),
-                      DropdownMenuItem(value: '480p', child: Text('480p')),
-                      DropdownMenuItem(value: '720p', child: Text('720p')),
-                      DropdownMenuItem(value: '1080p', child: Text('1080p')),
-                    ],
-                    onChanged: (value) => setState(() => _quality = value),
-                  ),
-                  DropdownButton<String?>(
-                    value: _audioBitrate,
-                    items: const [
-                      DropdownMenuItem(value: null, child: Text('Auto audio')),
-                      DropdownMenuItem(value: '128K', child: Text('128K')),
-                      DropdownMenuItem(value: '192K', child: Text('192K')),
-                      DropdownMenuItem(value: '320K', child: Text('320K')),
-                    ],
-                    onChanged: (value) => setState(() => _audioBitrate = value),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _submitting ? null : _startDownload,
-                icon: const Icon(Icons.download),
-                label: Text(_submitting ? 'Submitting...' : 'Start download'),
-              ),
+              if (_preview == null)
+                FilledButton.icon(
+                  onPressed: _submitting ? null : _inspectUrl,
+                  icon: const Icon(Icons.search),
+                  label: Text(_submitting ? 'Inspecting...' : 'Inspect URL'),
+                )
+              else ...[
+                _PreviewCard(preview: _preview!),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  children: [
+                    DropdownButton<String>(
+                      value: _format,
+                      items: _preview!.allowedOutputFormats
+                          .map(
+                            (format) => DropdownMenuItem(
+                              value: format,
+                              child: Text(format.toUpperCase()),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) => setState(() => _format = value!),
+                    ),
+                    DropdownButton<String?>(
+                      value: _quality,
+                      items: [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Auto quality'),
+                        ),
+                        ..._preview!.allowedVideoQualities.map(
+                          (quality) => DropdownMenuItem(
+                            value: quality,
+                            child: Text(quality),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) => setState(() => _quality = value),
+                    ),
+                    DropdownButton<String?>(
+                      value: _audioBitrate,
+                      items: [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Auto audio'),
+                        ),
+                        ..._preview!.allowedAudioBitrates.map(
+                          (bitrate) => DropdownMenuItem(
+                            value: bitrate,
+                            child: Text(bitrate),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _audioBitrate = value),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: _submitting ? null : _startDownload,
+                  icon: const Icon(Icons.download),
+                  label: Text(_submitting ? 'Submitting...' : 'Start download'),
+                ),
+              ],
               if (_error != null) ...[
                 const SizedBox(height: 16),
                 Text(
@@ -222,6 +274,37 @@ class _DownloadPageState extends State<DownloadPage> {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PreviewCard extends StatelessWidget {
+  const _PreviewCard({required this.preview});
+
+  final MediaPreview preview;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: preview.thumbnail == null
+            ? const Icon(Icons.video_library)
+            : Image.network(
+                preview.thumbnail!,
+                width: 96,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(Icons.broken_image);
+                },
+              ),
+        title: Text(preview.title),
+        subtitle: Text(
+          [
+            if (preview.uploader != null) preview.uploader!,
+            if (preview.durationSeconds != null) '${preview.durationSeconds}s',
+          ].join(' - '),
         ),
       ),
     );

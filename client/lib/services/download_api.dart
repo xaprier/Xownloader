@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/download_job.dart';
+import '../models/media_preview.dart';
 
 class DownloadApiException implements Exception {
   const DownloadApiException(this.statusCode, this.message);
@@ -22,6 +23,15 @@ class DownloadApi {
   final String _baseUrl;
   final String? token;
   final http.Client _client;
+
+  Future<MediaPreview> preview(String sourceUrl) async {
+    final response = await _client.post(
+      _uri('/api/v1/previews'),
+      headers: _headers,
+      body: jsonEncode({'source_url': sourceUrl}),
+    );
+    return _previewResponse(response);
+  }
 
   Future<DownloadJob> createDownload({
     required String sourceUrl,
@@ -67,6 +77,17 @@ class DownloadApi {
   };
 
   Uri _uri(String path) => Uri.parse('$_baseUrl$path');
+
+  MediaPreview _previewResponse(http.Response response) {
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw DownloadApiException(
+        response.statusCode,
+        body['detail']?.toString() ?? 'The server returned an error',
+      );
+    }
+    return MediaPreview.fromJson(body);
+  }
 
   DownloadJob _jobResponse(http.Response response) {
     final body = jsonDecode(response.body) as Map<String, dynamic>;

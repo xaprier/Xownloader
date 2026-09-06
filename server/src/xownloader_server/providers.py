@@ -1,9 +1,12 @@
 import asyncio
+import json
 import re
 import sys
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Protocol
+
+from pydantic import HttpUrl
 
 from xownloader_server.models import DownloadJob
 
@@ -21,9 +24,31 @@ class ProviderAdapter(Protocol):
     ) -> Path:
         """Download a job and return the published file path."""
 
+    async def inspect(self, source_url: HttpUrl) -> dict[str, object]:
+        """Return provider metadata without downloading media."""
+
 
 class YtDlpAdapter:
     name = "youtube"
+
+    async def inspect(self, source_url: HttpUrl) -> dict[str, object]:
+        process = await asyncio.create_subprocess_exec(
+            sys.executable,
+            "-m",
+            "yt_dlp",
+            "--dump-single-json",
+            "--skip-download",
+            "--no-playlist",
+            "--no-warnings",
+            str(source_url),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await process.communicate()
+        if process.returncode != 0:
+            message = stderr.decode(errors="replace").strip()[-1000:]
+            raise RuntimeError(message or "yt-dlp metadata inspection failed")
+        return json.loads(stdout)
 
     async def download(
         self,

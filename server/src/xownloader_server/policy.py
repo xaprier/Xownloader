@@ -10,9 +10,7 @@ class ServerPolicy:
         self.settings = settings
 
     def validate_request(self, request: DownloadRequest) -> None:
-        hostname = request.source_url.host.lower().rstrip(".")
-        if hostname not in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}:
-            raise PolicyViolation("Only YouTube URLs are supported in this release")
+        self.validate_source_url(request.source_url)
 
         if request.output_format.value not in self.settings.output_formats:
             raise PolicyViolation(f"Output format '{request.output_format.value}' is not enabled")
@@ -28,6 +26,11 @@ class ServerPolicy:
             and request.audio_bitrate.upper() not in self.settings.audio_bitrates
         ):
             raise PolicyViolation(f"Audio bitrate '{request.audio_bitrate}' is not enabled")
+
+    def validate_source_url(self, source_url: object) -> None:
+        hostname = source_url.host.lower().rstrip(".")
+        if hostname not in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}:
+            raise PolicyViolation("Only YouTube URLs are supported in this release")
 
     def ensure_disk_capacity(self) -> None:
         self.settings.download_directory.mkdir(parents=True, exist_ok=True)

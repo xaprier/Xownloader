@@ -26,6 +26,22 @@ class DownloadRequest(BaseModel):
     audio_bitrate: str | None = Field(default=None, pattern=r"^[0-9]{2,3}K$")
 
 
+class PreviewRequest(BaseModel):
+    source_url: HttpUrl
+
+
+class PreviewResponse(BaseModel):
+    source_url: HttpUrl
+    provider: str
+    title: str
+    thumbnail: HttpUrl | None = None
+    uploader: str | None = None
+    duration_seconds: int | None = None
+    allowed_output_formats: list[OutputFormat]
+    allowed_video_qualities: list[str]
+    allowed_audio_bitrates: list[str]
+
+
 class DownloadJob(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     source_url: HttpUrl

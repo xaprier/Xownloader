@@ -9,6 +9,7 @@ adapters keep future integrations such as Instagram outside the shared API model
 - `GET /health` checks service availability.
 - `GET /ready` checks runtime dependencies, output storage, and disk reserve.
 - `GET /metrics` exposes basic Prometheus-compatible job counters.
+- `POST /api/v1/previews` inspects a YouTube URL without creating a download job.
 - `POST /api/v1/downloads` validates a YouTube request and queues a job.
 - `GET /api/v1/downloads` lists persisted job state.
 - `GET /api/v1/downloads/{id}` returns job status, progress, and retention metadata.
