@@ -116,8 +116,8 @@ class DownloadPage extends StatefulWidget {
 
 class _DownloadPageState extends State<DownloadPage> {
   final _urlController = TextEditingController();
+  final List<DownloadJob> _jobs = [];
   MediaPreview? _preview;
-  DownloadJob? _job;
   Timer? _pollTimer;
   StreamSubscription<String>? _shareSubscription;
   String _format = 'mp4';
@@ -151,7 +151,6 @@ class _DownloadPageState extends State<DownloadPage> {
     }
     setState(() {
       _error = null;
-      _job = null;
       _submitting = true;
     });
     try {
@@ -180,7 +179,11 @@ class _DownloadPageState extends State<DownloadPage> {
     _inspectUrl();
   }
 
-  Future<void> _startDownload() async {
+  bool _isActive(DownloadJob job) =>
+      job.status == DownloadStatus.queued ||
+      job.status == DownloadStatus.downloading;
+
+  Future<void> _addToQueue() async {
     final sourceUrl = _urlController.text.trim();
     if (_preview == null) {
       await _inspectUrl();
@@ -188,7 +191,6 @@ class _DownloadPageState extends State<DownloadPage> {
     }
     setState(() {
       _error = null;
-      _job = null;
       _submitting = true;
     });
     try {
@@ -199,8 +201,15 @@ class _DownloadPageState extends State<DownloadPage> {
         audioBitrate: _audioBitrate,
       );
       if (!mounted) return;
-      setState(() => _job = job);
-      _startPolling(job.id);
+      setState(() {
+        _jobs.insert(0, job);
+        _preview = null;
+        _quality = null;
+        _audioBitrate = null;
+        _format = 'mp4';
+        _urlController.clear();
+      });
+      _ensurePolling();
     } on DownloadApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
@@ -212,33 +221,42 @@ class _DownloadPageState extends State<DownloadPage> {
     }
   }
 
-  void _startPolling(String jobId) {
-    _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
+  void _ensurePolling() {
+    _pollTimer ??= Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _refreshActive(),
+    );
+  }
+
+  Future<void> _refreshActive() async {
+    final active = _jobs.where(_isActive).toList();
+    if (active.isEmpty) {
+      _pollTimer?.cancel();
+      _pollTimer = null;
+      return;
+    }
+    for (final job in active) {
       try {
-        final job = await widget.api.getDownload(jobId);
+        final fresh = await widget.api.getDownload(job.id);
         if (!mounted) return;
-        setState(() => _job = job);
-        if ({
-          DownloadStatus.completed,
-          DownloadStatus.failed,
-          DownloadStatus.cancelled,
-        }.contains(job.status)) {
-          _pollTimer?.cancel();
-        }
+        setState(() {
+          final index = _jobs.indexWhere((j) => j.id == fresh.id);
+          if (index != -1) _jobs[index] = fresh;
+        });
       } on DownloadApiException catch (error) {
         if (mounted) setState(() => _error = error.message);
       }
-    });
+    }
   }
 
-  Future<void> _cancelDownload() async {
-    final job = _job;
-    if (job == null) return;
-    _pollTimer?.cancel();
+  Future<void> _cancel(DownloadJob job) async {
     try {
       final cancelled = await widget.api.cancelDownload(job.id);
-      if (mounted) setState(() => _job = cancelled);
+      if (!mounted) return;
+      setState(() {
+        final index = _jobs.indexWhere((j) => j.id == cancelled.id);
+        if (index != -1) _jobs[index] = cancelled;
+      });
     } on DownloadApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     }
@@ -246,120 +264,165 @@ class _DownloadPageState extends State<DownloadPage> {
 
   @override
   Widget build(BuildContext context) {
-    final job = _job;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Xownloader'),
-        actions: [ThemeModeMenu(controller: widget.themeController)],
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              Text(
-                'Download YouTube media',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 8),
-              Text('Server: ${AppConfig.serverUrl}'),
-              const SizedBox(height: 24),
-              TextField(
-                controller: _urlController,
-                keyboardType: TextInputType.url,
-                decoration: const InputDecoration(labelText: 'YouTube URL'),
-                onSubmitted: (_) => _inspectUrl(),
-              ),
-              const SizedBox(height: 16),
-              if (_preview == null)
-                FilledButton.icon(
-                  onPressed: _submitting ? null : _inspectUrl,
-                  icon: _submitting
-                      ? const _ButtonSpinner()
-                      : const Icon(Icons.search),
-                  label: Text(_submitting ? 'Inspecting...' : 'Inspect URL'),
-                )
-              else ...[
-                _PreviewCard(preview: _preview!),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 16,
-                  children: [
-                    DropdownButton<String>(
-                      value: _format,
-                      items: _preview!.allowedOutputFormats
-                          .map(
-                            (format) => DropdownMenuItem(
-                              value: format,
-                              child: Text(format.toUpperCase()),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) => setState(() => _format = value!),
-                    ),
-                    DropdownButton<String?>(
-                      value: _quality,
-                      items: [
-                        const DropdownMenuItem(
-                          value: null,
-                          child: Text('Auto quality'),
-                        ),
-                        ..._preview!.allowedVideoQualities.map(
-                          (quality) => DropdownMenuItem(
-                            value: quality,
-                            child: Text(quality),
-                          ),
-                        ),
-                      ],
-                      onChanged: (value) => setState(() => _quality = value),
-                    ),
-                    DropdownButton<String?>(
-                      value: _audioBitrate,
-                      items: [
-                        const DropdownMenuItem(
-                          value: null,
-                          child: Text('Auto audio'),
-                        ),
-                        ..._preview!.allowedAudioBitrates.map(
-                          (bitrate) => DropdownMenuItem(
-                            value: bitrate,
-                            child: Text(bitrate),
-                          ),
-                        ),
-                      ],
-                      onChanged: (value) =>
-                          setState(() => _audioBitrate = value),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: _submitting ? null : _startDownload,
-                  icon: _submitting
-                      ? const _ButtonSpinner()
-                      : const Icon(Icons.download),
-                  label: Text(_submitting ? 'Submitting...' : 'Start download'),
-                ),
-              ],
-              if (_error != null) ...[
-                const SizedBox(height: 16),
-                _ErrorBanner(message: _error!),
-              ],
-              if (job != null) ...[
-                const SizedBox(height: 24),
-                _JobStatusCard(
-                  job: job,
-                  api: widget.api,
-                  onCancel: _cancelDownload,
-                ),
-              ],
-            ],
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Xownloader'),
+          actions: [ThemeModeMenu(controller: widget.themeController)],
+          bottom: const TabBar(
+            tabs: [Tab(text: 'Active'), Tab(text: 'Done')],
           ),
+        ),
+        body: TabBarView(
+          children: [_buildActiveTab(context), _buildDoneTab(context)],
         ),
       ),
     );
+  }
+
+  Widget _tabShell({required List<Widget> children}) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720),
+        child: ListView(
+          padding: const EdgeInsets.all(24),
+          children: children,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActiveTab(BuildContext context) {
+    final active = _jobs.where(_isActive).toList();
+    return _tabShell(
+      children: [
+        ..._buildComposer(context),
+        for (final job in active) ...[
+          const SizedBox(height: 16),
+          _JobStatusCard(
+            job: job,
+            api: widget.api,
+            onCancel: () => _cancel(job),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDoneTab(BuildContext context) {
+    final done = _jobs.where((job) => !_isActive(job)).toList();
+    if (done.isEmpty) {
+      return _tabShell(
+        children: const [
+          Padding(
+            padding: EdgeInsets.only(top: 48),
+            child: Center(child: Text('No finished downloads yet.')),
+          ),
+        ],
+      );
+    }
+    return _tabShell(
+      children: [
+        for (final job in done) ...[
+          _JobStatusCard(job: job, api: widget.api, onCancel: () => _cancel(job)),
+          const SizedBox(height: 16),
+        ],
+      ],
+    );
+  }
+
+  List<Widget> _buildComposer(BuildContext context) {
+    return [
+      Text(
+        'Download YouTube media',
+        style: Theme.of(context).textTheme.headlineMedium,
+      ),
+      const SizedBox(height: 8),
+      Text('Server: ${AppConfig.serverUrl}'),
+      const SizedBox(height: 24),
+      TextField(
+        controller: _urlController,
+        keyboardType: TextInputType.url,
+        decoration: const InputDecoration(labelText: 'YouTube URL'),
+        onSubmitted: (_) => _inspectUrl(),
+      ),
+      const SizedBox(height: 16),
+      if (_preview == null)
+        FilledButton.icon(
+          onPressed: _submitting ? null : _inspectUrl,
+          icon: _submitting
+              ? const _ButtonSpinner()
+              : const Icon(Icons.search),
+          label: Text(_submitting ? 'Inspecting...' : 'Inspect URL'),
+        )
+      else ...[
+        _PreviewCard(preview: _preview!),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: [
+            DropdownButton<String>(
+              value: _format,
+              items: _preview!.allowedOutputFormats
+                  .map(
+                    (format) => DropdownMenuItem(
+                      value: format,
+                      child: Text(format.toUpperCase()),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => _format = value!),
+            ),
+            DropdownButton<String?>(
+              value: _quality,
+              items: [
+                const DropdownMenuItem(
+                  value: null,
+                  child: Text('Auto quality'),
+                ),
+                ..._preview!.allowedVideoQualities.map(
+                  (quality) => DropdownMenuItem(
+                    value: quality,
+                    child: Text(quality),
+                  ),
+                ),
+              ],
+              onChanged: (value) => setState(() => _quality = value),
+            ),
+            DropdownButton<String?>(
+              value: _audioBitrate,
+              items: [
+                const DropdownMenuItem(
+                  value: null,
+                  child: Text('Auto audio'),
+                ),
+                ..._preview!.allowedAudioBitrates.map(
+                  (bitrate) => DropdownMenuItem(
+                    value: bitrate,
+                    child: Text(bitrate),
+                  ),
+                ),
+              ],
+              onChanged: (value) => setState(() => _audioBitrate = value),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: _submitting ? null : _addToQueue,
+          icon: _submitting
+              ? const _ButtonSpinner()
+              : const Icon(Icons.playlist_add),
+          label: Text(_submitting ? 'Submitting...' : 'Add to queue'),
+        ),
+      ],
+      if (_error != null) ...[
+        const SizedBox(height: 16),
+        _ErrorBanner(message: _error!),
+      ],
+    ];
   }
 }
 
