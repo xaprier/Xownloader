@@ -36,6 +36,10 @@ adapters must not own HTTP routes, client state, or retention policy.
    liveness, readiness, and counters without exposing provider internals to clients.
 - Access control uses instance API tokens rather than user accounts: client scope is for
    download operations, while admin scope is required for all-job and operational views.
+- The completed-file routes (`/api/v1/downloads/{id}/file` and `/file/{name}`) are
+   unauthenticated: the unguessable job id is the capability and retention expiry bounds
+   exposure. The trailing name segment is decorative so browsers and download managers
+   save the file under the original video title; the server serves the file by id.
 - SQLite schema changes are versioned and cleanup failures remain persisted for a later
    retry instead of being silently discarded.
 

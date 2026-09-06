@@ -186,8 +186,7 @@ async def cancel_download(
         ) from error
 
 
-@app.get("/api/v1/downloads/{job_id}/file", response_class=FileResponse, tags=["downloads"])
-def download_file(job_id: UUID, _: None = Depends(require_client_scope)) -> FileResponse:
+def _download_response(job_id: UUID) -> FileResponse:
     try:
         job = job_manager.get_job(job_id)
     except JobNotFound as error:
@@ -197,4 +196,20 @@ def download_file(job_id: UUID, _: None = Depends(require_client_scope)) -> File
         ) from error
     if job.status.value != "completed" or not job.file_path or not job.file_path.exists():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Download is not ready")
-    return FileResponse(path=job.file_path, filename=job.file_name)
+    return FileResponse(path=job.file_path, filename=job.display_name or job.file_name)
+
+
+@app.get("/api/v1/downloads/{job_id}/file", response_class=FileResponse, tags=["downloads"])
+def download_file(job_id: UUID) -> FileResponse:
+    # Unauthenticated: the unguessable job id is the capability, bounded by retention.
+    return _download_response(job_id)
+
+
+@app.get(
+    "/api/v1/downloads/{job_id}/file/{filename}",
+    response_class=FileResponse,
+    tags=["downloads"],
+)
+def download_file_named(job_id: UUID, filename: str) -> FileResponse:
+    # `filename` is decorative so downloaders save a friendly name; its value is ignored.
+    return _download_response(job_id)
