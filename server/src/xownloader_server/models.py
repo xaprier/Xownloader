@@ -38,6 +38,8 @@ class DownloadJob(BaseModel):
     error: str | None = None
     file_name: str | None = None
     file_size_bytes: int | None = None
+    cleanup_attempts: int = 0
+    last_cleanup_error: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     expires_at: datetime | None = None

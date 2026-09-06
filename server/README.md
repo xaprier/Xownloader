@@ -33,6 +33,8 @@ cleanup task removes them after the configured retention period.
 
 The server reads `yt-dlp` progress output and persists job progress. SQLite uses a schema
 version so incompatible future database changes can fail fast instead of corrupting state.
+The current schema tracks cleanup attempts and the last cleanup error; periodic cleanup
+retries expired files without stopping when one file is temporarily unavailable.
 
 ```bash
 uv sync
