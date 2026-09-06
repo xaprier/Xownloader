@@ -44,4 +44,7 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()" || exit 1
 
-CMD ["uvicorn", "xownloader_server.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --proxy-headers + --forwarded-allow-ips let the app trust X-Forwarded-* from a
+# reverse proxy, so per-client rate limiting sees real client IPs. The container
+# is only reachable through that proxy (compose publishes to 127.0.0.1).
+CMD ["uvicorn", "xownloader_server.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
