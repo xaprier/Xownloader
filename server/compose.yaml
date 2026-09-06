@@ -5,8 +5,9 @@ services:
     image: xownloader-server
     ports:
       # Bind to loopback only; a reverse proxy on the host terminates TLS and
-      # forwards to this. Use "8000:8000" for direct local access instead.
-      - "127.0.0.1:8000:8000"
+      # forwards to this. Set XOWNLOADER_HOST_PORT in .env to pick the host port
+      # (e.g. when 8000 is taken); the reverse proxy must match it.
+      - "127.0.0.1:${XOWNLOADER_HOST_PORT:-8000}:8000"
     # Optional: provide deployment values (tokens, CORS, policy limits).
     # Copy .env.example to .env to use it; runs on image defaults when absent.
     env_file:

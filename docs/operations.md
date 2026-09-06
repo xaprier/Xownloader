@@ -26,6 +26,8 @@ curl -s   http://localhost:8000/ready   # expect "ready": true
 - The container process runs as UID/GID `1000:1000` so it can write the bind mount.
   If `server/data/` is owned by a different user, start it with that owner:
   `XOWNLOADER_UID=$(id -u) XOWNLOADER_GID=$(id -g) docker compose up -d`.
+- The published host port defaults to `8000`. Set `XOWNLOADER_HOST_PORT` in `.env`
+  when that port is taken, and point the reverse proxy at the same value.
 - The container always binds `0.0.0.0` inside its network namespace; publish the port
   (`ports: "8000:8000"`) or place it behind a reverse proxy that terminates TLS.
 - `.env` values still apply — set `XOWNLOADER_CLIENT_API_TOKEN`,
