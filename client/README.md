@@ -14,6 +14,13 @@ cp .env.example .env
 Set `XOWNLOADER_SERVER_URL` to the server API origin. The default points to a local
 development server at `http://127.0.0.1:8000`. Do not commit `.env`.
 
+Set `XOWNLOADER_CLIENT_API_TOKEN` when the server runs in production. The client uses
+the token for download creation, status polling, cancellation, and file retrieval.
+
+The current screen supports the server download contract: YouTube URL submission,
+MP4/MP3 selection, video quality and audio bitrate options, progress polling, error
+display, cancellation, and the completed file URL.
+
 Install the Flutter stable channel, then run:
 
 ```bash
