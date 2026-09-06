@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 
 from xownloader_server import __version__
 from xownloader_server.config import settings
@@ -17,6 +17,7 @@ from xownloader_server.errors import (
 )
 from xownloader_server.jobs import JobManager
 from xownloader_server.models import DownloadJob, DownloadRequest
+from xownloader_server.runtime import check_runtime
 
 app = FastAPI(
     title="Xownloader API",
@@ -53,6 +54,19 @@ app.router.lifespan_context = lifespan
 @app.get("/health", tags=["system"])
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "xownloader-server", "version": __version__}
+
+
+@app.get("/ready", tags=["system"])
+def readiness() -> dict[str, object]:
+    runtime = check_runtime(settings)
+    if not runtime["ready"]:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=runtime)
+    return runtime
+
+
+@app.get("/metrics", response_class=PlainTextResponse, tags=["system"])
+def metrics() -> PlainTextResponse:
+    return PlainTextResponse(job_manager.metrics.prometheus())
 
 
 @app.get("/api/v1/downloads", response_model=list[DownloadJob], tags=["downloads"])

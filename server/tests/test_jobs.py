@@ -10,10 +10,12 @@ from xownloader_server.models import DownloadRequest, JobStatus
 class FakeAdapter:
     name = "youtube"
 
-    async def download(self, job, output_directory: Path) -> Path:
+    async def download(self, job, output_directory: Path, progress_callback) -> Path:
+        await progress_callback(25)
         output_path = output_directory / f"{job.id}.mp4"
         output_directory.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(b"test media")
+        await progress_callback(100)
         return output_path
 
 
@@ -35,6 +37,7 @@ async def test_job_manager_completes_and_sets_retention(tmp_path: Path) -> None:
 
     completed_job = manager.get_job(job.id)
     assert completed_job.status == JobStatus.COMPLETED
+    assert completed_job.progress_percent == 100
     assert completed_job.file_size_bytes == len(b"test media")
     assert completed_job.expires_at is not None
 

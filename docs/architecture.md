@@ -30,6 +30,8 @@ adapters must not own HTTP routes, client state, or retention policy.
 - Provider adapters are the only layer allowed to know how a provider is downloaded.
 - Job metadata is persisted in SQLite; interrupted jobs are marked failed during startup
    rather than silently disappearing.
+- The provider adapter reports progress to the job manager; operational endpoints expose
+   liveness, readiness, and counters without exposing provider internals to clients.
 
 ## Operational boundaries
 

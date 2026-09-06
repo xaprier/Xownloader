@@ -6,6 +6,8 @@ from uuid import UUID
 
 from xownloader_server.models import DownloadJob
 
+CURRENT_SCHEMA_VERSION = 1
+
 
 class JobRepository:
     def __init__(self, database_path: Path) -> None:
@@ -17,6 +19,9 @@ class JobRepository:
 
     def _initialize(self) -> None:
         with self._connection:
+            version = self._connection.execute("PRAGMA user_version").fetchone()[0]
+            if version > CURRENT_SCHEMA_VERSION:
+                raise RuntimeError("Database schema is newer than this server version")
             self._connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS jobs (
@@ -38,6 +43,7 @@ class JobRepository:
                 )
                 """
             )
+            self._connection.execute(f"PRAGMA user_version = {CURRENT_SCHEMA_VERSION}")
 
     def save(self, job: DownloadJob) -> None:
         values = (

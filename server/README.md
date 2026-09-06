@@ -7,6 +7,8 @@ adapters keep future integrations such as Instagram outside the shared API model
 ## API resources
 
 - `GET /health` checks service availability.
+- `GET /ready` checks runtime dependencies, output storage, and disk reserve.
+- `GET /metrics` exposes basic Prometheus-compatible job counters.
 - `POST /api/v1/downloads` validates a YouTube request and queues a job.
 - `GET /api/v1/downloads` lists in-memory job state.
 - `GET /api/v1/downloads/{id}` returns job status, progress, and retention metadata.
@@ -19,6 +21,9 @@ disk space. Job metadata is stored in SQLite at `XOWNLOADER_DATABASE_PATH`, so s
 retention metadata survive a server restart. Interrupted active jobs are marked failed
 for explicit client recovery. Completed files receive an expiration time and a server
 cleanup task removes them after the configured retention period.
+
+The server reads `yt-dlp` progress output and persists job progress. SQLite uses a schema
+version so incompatible future database changes can fail fast instead of corrupting state.
 
 ```bash
 uv sync

@@ -1,15 +1,19 @@
 import asyncio
+import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID
 
 from xownloader_server.config import Settings
 from xownloader_server.errors import JobNotFound, QueueFull
+from xownloader_server.metrics import Metrics
 from xownloader_server.models import DownloadJob, DownloadRequest, JobStatus
 from xownloader_server.policy import ServerPolicy
-from xownloader_server.providers import ProviderAdapter, YtDlpAdapter
+from xownloader_server.providers import ProgressCallback, ProviderAdapter, YtDlpAdapter
 from xownloader_server.rate_limit import RateLimiter
 from xownloader_server.repository import JobRepository
+
+logger = logging.getLogger(__name__)
 
 
 class JobManager:
@@ -23,6 +27,7 @@ class JobManager:
         self.policy = ServerPolicy(settings)
         self.adapter = adapter or YtDlpAdapter()
         self.repository = repository or JobRepository(settings.database_path)
+        self.metrics = Metrics()
         self.rate_limiter = RateLimiter(settings.rate_limit_requests_per_minute)
         self._semaphore = asyncio.Semaphore(settings.max_concurrent_downloads)
         self._jobs: dict[UUID, DownloadJob] = {
@@ -65,6 +70,8 @@ class JobManager:
         )
         self._jobs[job.id] = job
         self.repository.save(job)
+        self.metrics.increment("downloads_created_total")
+        logger.info("download_queued", extra={"job_id": str(job.id), "provider": job.provider})
         self._tasks[job.id] = asyncio.create_task(self._run(job))
         return job
 
@@ -86,8 +93,12 @@ class JobManager:
                 continue
             path = Path(job.file_path)
             if path.exists():
-                path.unlink()
-                removed += 1
+                try:
+                    path.unlink()
+                    removed += 1
+                except OSError:
+                    logger.exception("download_cleanup_failed", extra={"job_id": str(job.id)})
+                    continue
             job.file_path = None
             self.repository.save(job)
         return removed
@@ -97,7 +108,11 @@ class JobManager:
             async with self._semaphore:
                 job.status = JobStatus.DOWNLOADING
                 self.repository.save(job)
-                job.file_path = await self.adapter.download(job, self.settings.download_directory)
+                job.file_path = await self.adapter.download(
+                    job,
+                    self.settings.download_directory,
+                    self._progress_callback(job),
+                )
                 job.file_name = Path(job.file_path).name
                 job.file_size_bytes = Path(job.file_path).stat().st_size
                 try:
@@ -110,12 +125,25 @@ class JobManager:
                 job.completed_at = datetime.now(UTC)
                 job.expires_at = job.completed_at + timedelta(hours=self.settings.retention_hours)
                 self.repository.save(job)
+                self.metrics.increment("downloads_completed_total")
+                logger.info("download_completed", extra={"job_id": str(job.id)})
         except asyncio.CancelledError:
             job.status = JobStatus.CANCELLED
             job.completed_at = datetime.now(UTC)
             self.repository.save(job)
+            self.metrics.increment("downloads_cancelled_total")
+            logger.info("download_cancelled", extra={"job_id": str(job.id)})
         except Exception as error:  # noqa: BLE001
             job.status = JobStatus.FAILED
             job.error = str(error)
             job.completed_at = datetime.now(UTC)
             self.repository.save(job)
+            self.metrics.increment("downloads_failed_total")
+            logger.exception("download_failed", extra={"job_id": str(job.id)})
+
+    def _progress_callback(self, job: DownloadJob) -> ProgressCallback:
+        async def update(progress_percent: float) -> None:
+            job.progress_percent = max(0, min(progress_percent, 100))
+            self.repository.save(job)
+
+        return update
