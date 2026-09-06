@@ -6,7 +6,7 @@ from uuid import UUID
 
 from xownloader_server.models import DownloadJob
 
-CURRENT_SCHEMA_VERSION = 2
+CURRENT_SCHEMA_VERSION = 3
 
 
 class JobRepository:
@@ -35,6 +35,8 @@ class JobRepository:
                     status TEXT NOT NULL,
                     progress_percent REAL NOT NULL,
                     error TEXT,
+                    title TEXT,
+                    display_name TEXT,
                     file_name TEXT,
                     file_size_bytes INTEGER,
                     created_at TEXT NOT NULL,
@@ -51,6 +53,9 @@ class JobRepository:
                     "ALTER TABLE jobs ADD COLUMN cleanup_attempts INTEGER NOT NULL DEFAULT 0"
                 )
                 self._connection.execute("ALTER TABLE jobs ADD COLUMN last_cleanup_error TEXT")
+            if version in (1, 2):
+                self._connection.execute("ALTER TABLE jobs ADD COLUMN title TEXT")
+                self._connection.execute("ALTER TABLE jobs ADD COLUMN display_name TEXT")
             self._connection.execute(f"PRAGMA user_version = {CURRENT_SCHEMA_VERSION}")
 
     def save(self, job: DownloadJob) -> None:
@@ -64,6 +69,8 @@ class JobRepository:
             job.status.value,
             job.progress_percent,
             job.error,
+            job.title,
+            job.display_name,
             job.file_name,
             job.file_size_bytes,
             job.created_at.isoformat(),
@@ -78,13 +85,16 @@ class JobRepository:
                 """
                 INSERT INTO jobs (
                     id, source_url, provider, output_format, video_quality, audio_bitrate,
-                    status, progress_percent, error, file_name, file_size_bytes, created_at,
-                    completed_at, expires_at, file_path, cleanup_attempts, last_cleanup_error
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    status, progress_percent, error, title, display_name, file_name,
+                    file_size_bytes, created_at, completed_at, expires_at, file_path,
+                    cleanup_attempts, last_cleanup_error
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     status=excluded.status,
                     progress_percent=excluded.progress_percent,
                     error=excluded.error,
+                    title=excluded.title,
+                    display_name=excluded.display_name,
                     file_name=excluded.file_name,
                     file_size_bytes=excluded.file_size_bytes,
                     completed_at=excluded.completed_at,
@@ -131,6 +141,8 @@ class JobRepository:
                 "status": row["status"],
                 "progress_percent": row["progress_percent"],
                 "error": row["error"],
+                "title": row["title"],
+                "display_name": row["display_name"],
                 "file_name": row["file_name"],
                 "file_size_bytes": row["file_size_bytes"],
                 "created_at": row["created_at"],

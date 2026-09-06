@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -8,6 +9,7 @@ from xownloader_server.config import Settings
 from xownloader_server.errors import JobNotFound, QueueFull
 from xownloader_server.metrics import Metrics
 from xownloader_server.models import DownloadJob, DownloadRequest, JobStatus
+from xownloader_server.naming import build_display_name
 from xownloader_server.policy import ServerPolicy
 from xownloader_server.providers import ProgressCallback, ProviderAdapter, YtDlpAdapter
 from xownloader_server.rate_limit import RateLimiter
@@ -122,6 +124,10 @@ class JobManager:
                 )
                 job.file_name = Path(job.file_path).name
                 job.file_size_bytes = Path(job.file_path).stat().st_size
+                job.title = self._read_info_title(job)
+                job.display_name = build_display_name(
+                    job.title, job.output_format, fallback=job.file_name
+                )
                 try:
                     self.policy.ensure_file_size(job.file_size_bytes)
                 except Exception:
@@ -147,6 +153,20 @@ class JobManager:
             self.repository.save(job)
             self.metrics.increment("downloads_failed_total")
             logger.exception("download_failed", extra={"job_id": str(job.id)})
+
+    def _read_info_title(self, job: DownloadJob) -> str | None:
+        info_path = self.settings.download_directory / f"{job.id}.info.json"
+        title: str | None = None
+        if info_path.exists():
+            try:
+                data = json.loads(info_path.read_text())
+                value = data.get("title")
+                title = str(value) if value else None
+            except (OSError, ValueError):
+                title = None
+            finally:
+                info_path.unlink(missing_ok=True)
+        return title
 
     def _progress_callback(self, job: DownloadJob) -> ProgressCallback:
         async def update(progress_percent: float) -> None:

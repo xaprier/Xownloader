@@ -9,6 +9,7 @@ class DownloadJob {
     required this.progressPercent,
     this.error,
     this.fileName,
+    this.displayName,
     this.expiresAt,
   });
 
@@ -19,6 +20,7 @@ class DownloadJob {
   final double progressPercent;
   final String? error;
   final String? fileName;
+  final String? displayName;
   final DateTime? expiresAt;
 
   factory DownloadJob.fromJson(Map<String, dynamic> json) {
@@ -30,6 +32,7 @@ class DownloadJob {
       progressPercent: (json['progress_percent'] as num).toDouble(),
       error: json['error'] as String?,
       fileName: json['file_name'] as String?,
+      displayName: json['display_name'] as String?,
       expiresAt: json['expires_at'] == null
           ? null
           : DateTime.parse(json['expires_at'] as String),

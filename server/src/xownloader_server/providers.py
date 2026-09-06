@@ -64,6 +64,7 @@ class YtDlpAdapter:
             "yt_dlp",
             "--no-playlist",
             "--restrict-filenames",
+            "--write-info-json",
             "--newline",
             "--output",
             str(output_template),
@@ -103,7 +104,11 @@ class YtDlpAdapter:
             message = stderr.decode(errors="replace").strip()[-1000:]
             raise RuntimeError(message or "yt-dlp failed")
 
-        candidates = sorted(output_directory.glob(f"{job.id}.*"))
+        candidates = sorted(
+            path
+            for path in output_directory.glob(f"{job.id}.*")
+            if not path.name.endswith(".info.json")
+        )
         if not candidates:
             raise RuntimeError("yt-dlp completed without producing an output file")
         return candidates[0]
