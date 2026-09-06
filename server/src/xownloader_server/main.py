@@ -14,11 +14,13 @@ from xownloader_server.errors import (
     InsufficientStorage,
     JobNotFound,
     PolicyViolation,
+    PreviewUnavailable,
     QueueFull,
     RateLimitExceeded,
 )
 from xownloader_server.jobs import JobManager
-from xownloader_server.models import DownloadJob, DownloadRequest
+from xownloader_server.models import DownloadJob, DownloadRequest, PreviewRequest, PreviewResponse
+from xownloader_server.previews import PreviewService
 from xownloader_server.runtime import check_runtime
 
 app = FastAPI(
@@ -54,6 +56,8 @@ async def lifespan(_: FastAPI):
 
 
 job_manager = JobManager(settings)
+preview_service = PreviewService(settings)
+app.state.preview_service = preview_service
 app.router.lifespan_context = lifespan
 
 
@@ -73,6 +77,30 @@ def readiness() -> dict[str, object]:
 @app.get("/metrics", response_class=PlainTextResponse, tags=["system"])
 def metrics(_: None = Depends(require_admin_scope)) -> PlainTextResponse:
     return PlainTextResponse(job_manager.metrics.prometheus())
+
+
+@app.post("/api/v1/previews", response_model=PreviewResponse, tags=["previews"])
+async def create_preview(
+    request: Request,
+    payload: PreviewRequest,
+    _: None = Depends(require_client_scope),
+) -> PreviewResponse:
+    client_key = request.client.host if request.client else "unknown"
+    try:
+        return await app.state.preview_service.inspect(payload, client_key)
+    except PolicyViolation as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+    except RateLimitExceeded as error:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(error),
+            headers={"Retry-After": "60"},
+        ) from error
+    except PreviewUnavailable as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(error),
+        ) from error
 
 
 @app.get("/api/v1/downloads", response_model=list[DownloadJob], tags=["downloads"])

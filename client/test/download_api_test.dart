@@ -39,7 +39,10 @@ void main() {
     );
 
     expect(job.status, DownloadStatus.queued);
-    expect(client.lastRequest?.url.toString(), 'http://localhost:8000/api/v1/downloads');
+    expect(
+      client.lastRequest?.url.toString(),
+      'http://localhost:8000/api/v1/downloads',
+    );
     expect(client.lastRequest?.headers['authorization'], 'Bearer client-token');
     final request = client.lastRequest! as http.Request;
     expect(jsonDecode(request.body), {

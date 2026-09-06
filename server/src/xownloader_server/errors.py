@@ -14,5 +14,9 @@ class InsufficientStorage(Exception):
     """Raised when the configured free-disk reserve is unavailable."""
 
 
+class PreviewUnavailable(Exception):
+    """Raised when provider metadata cannot be inspected."""
+
+
 class JobNotFound(Exception):
     """Raised when a requested job does not exist."""

@@ -11,12 +11,14 @@ while download policy and retention remain server-owned.
 ## Request flow
 
 1. A client submits a YouTube URL and requested output preferences.
-2. The API validates the request and creates a download job.
-3. A server worker invokes `yt-dlp` through an adapter with server-side policy.
-4. The job exposes progress and a terminal state to the client.
-5. The server returns or streams the output while retaining it only for the configured
+2. The client requests a provider preview; the server inspects metadata without creating
+   a job and returns server-approved output options.
+3. The user confirms the options and the API validates the request and creates a download job.
+4. A server worker invokes `yt-dlp` through an adapter with server-side policy.
+5. The job exposes progress and a terminal state to the client.
+6. The server returns or streams the output while retaining it only for the configured
    period.
-6. Cleanup removes expired files and records the cleanup result.
+7. Cleanup removes expired files and records the cleanup result.
 
 The API should remain provider-neutral even though the first provider is YouTube. Provider
 adapters must not own HTTP routes, client state, or retention policy.
