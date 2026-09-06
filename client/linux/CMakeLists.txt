@@ -126,3 +126,28 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
   install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
 endif()
+
+# === Desktop integration ===
+# Window icon loaded at runtime from the bundle.
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/app_icon.png"
+  DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
+  COMPONENT Runtime)
+
+# hicolor icon theme entries, used once the app is installed to a prefix.
+foreach(icon_size 16 32 48 64 128 256 512)
+  install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/${icon_size}.png"
+    DESTINATION
+      "${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/${icon_size}x${icon_size}/apps"
+    RENAME "${APPLICATION_ID}.png"
+    COMPONENT Runtime)
+endforeach()
+
+# Freedesktop launcher entry.
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/xownloader.desktop.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/${APPLICATION_ID}.desktop"
+  @ONLY)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${APPLICATION_ID}.desktop"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/share/applications"
+  COMPONENT Runtime)

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Xownloader
+GenericName=Media Downloader
+Comment=Download media through a self-hosted Xownloader server
+Exec=@BINARY_NAME@ %U
+Icon=@APPLICATION_ID@
+Terminal=false
+Categories=Network;FileTransfer;
+StartupWMClass=@APPLICATION_ID@

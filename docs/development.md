@@ -37,6 +37,17 @@ The client theme (System/Light/Dark) is a local per-device preference stored wit
 changing the brand art with `dart run flutter_launcher_icons` (config in
 `client/flutter_launcher_icons.yaml`).
 
+### Platform notes
+
+- Cleartext HTTP is blocked by default on Android and iOS. It is permitted only for
+  loopback and the Android emulator host (`10.0.2.2`) so a local `http://` server works
+  in development. A deployed server must be reached over HTTPS.
+- macOS builds require the `com.apple.security.network.client` entitlement (already set)
+  to reach the server from the sandbox.
+- `flutter build linux` produces a relocatable bundle. Installing it to a prefix
+  (`cmake --install build/linux/x64/release -DCMAKE_INSTALL_PREFIX=/usr/local`) also
+  installs the `.desktop` entry and hicolor icons for desktop-environment integration.
+
 For web development, add the browser origin to `XOWNLOADER_CORS_ALLOWED_ORIGINS` in the
 server `.env`. Do not use a wildcard CORS origin in a deployed environment.
 
