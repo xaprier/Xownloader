@@ -52,6 +52,8 @@ class DownloadJob(BaseModel):
     status: JobStatus = JobStatus.QUEUED
     progress_percent: float = 0
     error: str | None = None
+    title: str | None = None
+    display_name: str | None = None
     file_name: str | None = None
     file_size_bytes: int | None = None
     cleanup_attempts: int = 0

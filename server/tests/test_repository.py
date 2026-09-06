@@ -40,8 +40,29 @@ def test_v1_database_migrates_to_current_schema(tmp_path: Path) -> None:
 
     assert version == CURRENT_SCHEMA_VERSION
     columns = {row[1] for row in repository._connection.execute("PRAGMA table_info(jobs)")}
-    assert {"cleanup_attempts", "last_cleanup_error"} <= columns
+    assert {"cleanup_attempts", "last_cleanup_error", "title", "display_name"} <= columns
     repository.close()
+
+
+def test_persists_title_and_display_name(tmp_path: Path) -> None:
+    from xownloader_server.models import OutputFormat
+
+    repo = JobRepository(tmp_path / "jobs.db")
+    job = DownloadJob(
+        source_url="https://youtu.be/example",
+        output_format=OutputFormat.MP4,
+        title="Example Video",
+        display_name="Example Video.mp4",
+    )
+    repo.save(job)
+    repo.close()
+
+    reopened = JobRepository(tmp_path / "jobs.db")
+    loaded = reopened.get(job.id)
+    assert loaded is not None
+    assert loaded.title == "Example Video"
+    assert loaded.display_name == "Example Video.mp4"
+    reopened.close()
 
 
 def test_cleanup_failure_is_persisted_for_retry(tmp_path: Path) -> None:
