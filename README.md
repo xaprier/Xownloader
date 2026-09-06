@@ -82,10 +82,10 @@ branches with reviewed merges for repository contributions.
 
 ## Development status
 
-The repository currently contains the initial monorepo structure, a minimal API health
-check, and a generated Flutter client starter. The next implementation slice is the YouTube
-download lifecycle: request validation, job state, `yt-dlp` execution, file delivery,
-and retention cleanup. Tests and client features should be added with each slice.
+The repository currently contains the initial monorepo structure, a policy-controlled
+REST API foundation, and a generated Flutter client starter. The next implementation
+slice is durable job storage, authentication, progress reporting, and client integration.
+Tests and client features should be added with each slice.
 
 ## License
 

@@ -28,5 +28,8 @@ flutter build web
 flutter build linux
 ```
 
+For web development, add the browser origin to `XOWNLOADER_CORS_ALLOWED_ORIGINS` in the
+server `.env`. Do not use a wildcard CORS origin in a deployed environment.
+
 Keep local output in ignored directories. Do not use live provider downloads in automated
 tests.
