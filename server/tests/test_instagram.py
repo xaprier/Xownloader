@@ -188,6 +188,17 @@ async def test_inspect_maps_not_found_error():
         await adapter.inspect("https://www.instagram.com/p/Cphoto/")
 
 
+@pytest.mark.asyncio
+async def test_inspect_maps_400_media_unavailable_to_not_found():
+    # Instagram returns HTTP 400 for a deleted / private / bad media id.
+    adapter = _adapter(
+        None,
+        error=InstagramApiError(400, '{"message":"Media not found or unavailable"}'),
+    )
+    with pytest.raises(PreviewUnavailable, match="not found or not public"):
+        await adapter.inspect("https://www.instagram.com/p/Cphoto/")
+
+
 def _download_adapter(payload=_CAROUSEL, byte_body=None):
     async def fetch_json(path):
         return payload

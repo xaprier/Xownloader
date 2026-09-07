@@ -1,6 +1,6 @@
 [project]
 name = "xownloader-server"
-version = "0.1.0"
+version = "2.0.0"
 description = "Backend API for Xownloader media downloads"
 requires-python = ">=3.11"
 dependencies = [

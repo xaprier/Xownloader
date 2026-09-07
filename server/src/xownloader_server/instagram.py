@@ -101,7 +101,8 @@ class InstagramAdapter:
             return PreviewUnavailable("Instagram session is invalid or expired")
         if error.status == 429:
             return PreviewUnavailable("Instagram rate limit reached, try later")
-        if error.status == 404:
+        # Instagram answers a deleted / private / malformed media id with 400 or 404.
+        if error.status in (400, 404):
             return PreviewUnavailable("Post not found or not public")
         return PreviewUnavailable("The provider metadata could not be loaded")
 
