@@ -29,7 +29,7 @@ class ServerPolicy:
         ):
             raise PolicyViolation(f"Audio bitrate '{request.audio_bitrate}' is not enabled")
 
-        if getattr(request, "media_selection", None) is not None and provider != "instagram":
+        if request.media_selection is not None and provider != "instagram":
             raise PolicyViolation("Media selection is only valid for Instagram")
 
         return provider

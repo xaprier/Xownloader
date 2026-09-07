@@ -31,6 +31,15 @@ class PreviewRequest(BaseModel):
     source_url: HttpUrl
 
 
+class PreviewMediaItem(BaseModel):
+    index: int
+    type: str
+    thumbnail: HttpUrl | None = None
+    width: int | None = None
+    height: int | None = None
+    duration_seconds: int | None = None
+
+
 class PreviewResponse(BaseModel):
     source_url: HttpUrl
     provider: str
@@ -38,6 +47,7 @@ class PreviewResponse(BaseModel):
     thumbnail: HttpUrl | None = None
     uploader: str | None = None
     duration_seconds: int | None = None
+    media_items: list[PreviewMediaItem] | None = None
     allowed_output_formats: list[OutputFormat]
     allowed_video_qualities: list[str]
     allowed_audio_bitrates: list[str]

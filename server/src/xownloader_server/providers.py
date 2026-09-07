@@ -48,7 +48,16 @@ class YtDlpAdapter:
         if process.returncode != 0:
             message = stderr.decode(errors="replace").strip()[-1000:]
             raise RuntimeError(message or "yt-dlp metadata inspection failed")
-        return json.loads(stdout)
+        raw = json.loads(stdout)
+        duration = raw.get("duration")
+        return {
+            "provider": "youtube",
+            "title": str(raw.get("title") or "Untitled media"),
+            "uploader": raw.get("uploader") or raw.get("channel"),
+            "thumbnail": raw.get("thumbnail"),
+            "duration_seconds": int(duration) if isinstance(duration, (int, float)) else None,
+            "media_items": None,
+        }
 
     async def download(
         self,
