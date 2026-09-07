@@ -4,6 +4,8 @@ from xownloader_server.errors import PolicyViolation, PreviewUnavailable
 from xownloader_server.instagram import (
     InstagramAdapter,
     InstagramApiError,
+    InstagramSource,
+    parse_source,
     shortcode_from_url,
     shortcode_to_pk,
 )
@@ -119,9 +121,37 @@ def test_shortcode_from_url_accepts_post_reel_tv():
     assert shortcode_from_url("https://www.instagram.com/tv/Cghi3/") == "Cghi3"
 
 
-def test_shortcode_from_url_rejects_profile_and_stories():
-    with pytest.raises(PolicyViolation):
-        shortcode_from_url("https://www.instagram.com/nasa/")
+def test_parse_source_classifies_every_url_form():
+    assert parse_source("https://www.instagram.com/p/Cabc-1/") == InstagramSource(
+        kind="post", shortcode="Cabc-1"
+    )
+    assert parse_source("https://instagram.com/reel/Cdef_2/?hl=en") == InstagramSource(
+        kind="post", shortcode="Cdef_2"
+    )
+    assert parse_source(
+        "https://www.instagram.com/stories/highlights/18107691199400742/"
+    ) == InstagramSource(kind="highlight", highlight_id="18107691199400742")
+    assert parse_source(
+        "https://www.instagram.com/stories/nbakolej/3980885535123917366/"
+    ) == InstagramSource(kind="story", username="nbakolej", story_pk="3980885535123917366")
+    assert parse_source("https://www.instagram.com/stories/nbakolej/") == InstagramSource(
+        kind="story", username="nbakolej"
+    )
+
+
+def test_parse_source_rejects_unsupported_urls():
+    for url in (
+        "https://www.instagram.com/nasa/",
+        "https://www.instagram.com/explore/tags/space/",
+        "https://www.instagram.com/stories/",
+        "https://example.com/p/abc/",
+    ):
+        with pytest.raises(PolicyViolation):
+            parse_source(url)
+
+
+def test_shortcode_from_url_still_rejects_non_posts():
+    assert shortcode_from_url("https://www.instagram.com/p/Cabc-1/") == "Cabc-1"
     with pytest.raises(PolicyViolation):
         shortcode_from_url("https://www.instagram.com/stories/nasa/12345/")
 

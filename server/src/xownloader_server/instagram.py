@@ -7,16 +7,46 @@ import socket
 import urllib.error
 import urllib.request
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from xownloader_server.errors import PolicyViolation, PreviewUnavailable
 from xownloader_server.models import DownloadJob
 
 _POST_URL = re.compile(r"instagram\.com/(?:p|reel|reels|tv)/([A-Za-z0-9_-]+)")
+_HIGHLIGHT_URL = re.compile(r"instagram\.com/stories/highlights/(\d+)")
+_STORY_ITEM_URL = re.compile(r"instagram\.com/stories/([^/?#]+)/(\d+)")
+_STORY_USER_URL = re.compile(r"instagram\.com/stories/([^/?#]+)/?(?:$|[?#])")
 _B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 _APP_ID = "936619743392459"
 _MEDIA_VIDEO = 2
+
+
+@dataclass(frozen=True)
+class InstagramSource:
+    kind: Literal["post", "story", "highlight"]
+    shortcode: str | None = None
+    username: str | None = None
+    story_pk: str | None = None
+    highlight_id: str | None = None
+
+
+def parse_source(url: str) -> InstagramSource:
+    match = _POST_URL.search(url)
+    if match:
+        return InstagramSource(kind="post", shortcode=match.group(1))
+    match = _HIGHLIGHT_URL.search(url)
+    if match:
+        return InstagramSource(kind="highlight", highlight_id=match.group(1))
+    match = _STORY_ITEM_URL.search(url)
+    if match and match.group(1) != "highlights":
+        return InstagramSource(kind="story", username=match.group(1), story_pk=match.group(2))
+    match = _STORY_USER_URL.search(url)
+    if match and match.group(1) != "highlights":
+        return InstagramSource(kind="story", username=match.group(1))
+    raise PolicyViolation("Unsupported Instagram URL — posts, reels, stories, and highlights only")
+
 
 FetchJson = Callable[[str], Awaitable[dict[str, Any]]]
 FetchBytes = Callable[[str], Awaitable[bytes]]
@@ -30,13 +60,13 @@ class InstagramApiError(Exception):
 
 
 def shortcode_from_url(value: str) -> str:
-    match = _POST_URL.search(value)
-    if not match:
+    source = parse_source(value)
+    if source.kind != "post":
         raise PolicyViolation(
             "Only single Instagram posts and reels are supported "
             "(a URL containing /p/, /reel/, or /tv/)"
         )
-    return match.group(1)
+    return source.shortcode
 
 
 def shortcode_to_pk(shortcode: str) -> int:
