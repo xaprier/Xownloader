@@ -151,6 +151,7 @@ class _DownloadPageState extends State<DownloadPage> {
   String? _quality;
   String? _audioBitrate;
   String? _error;
+  String? _warning;
   bool _submitting = false;
 
   @override
@@ -184,6 +185,7 @@ class _DownloadPageState extends State<DownloadPage> {
     }
     setState(() {
       _error = null;
+      _warning = null;
       _submitting = true;
     });
     try {
@@ -196,7 +198,14 @@ class _DownloadPageState extends State<DownloadPage> {
             : preview.mediaItems!.map((item) => item.index).toSet();
       });
     } on DownloadApiException catch (error) {
-      if (mounted) setState(() => _error = error.message);
+      if (!mounted) return;
+      setState(() {
+        if (error.statusCode == 410) {
+          _warning = error.message;
+        } else {
+          _error = error.message;
+        }
+      });
     } catch (_) {
       if (mounted) {
         setState(() => _error = 'Could not reach the download server.');
@@ -229,6 +238,7 @@ class _DownloadPageState extends State<DownloadPage> {
     }
     setState(() {
       _error = null;
+      _warning = null;
       _submitting = true;
     });
     try {
@@ -249,11 +259,19 @@ class _DownloadPageState extends State<DownloadPage> {
         _quality = null;
         _audioBitrate = null;
         _format = 'mp4';
+        _warning = null;
         _urlController.clear();
       });
       _ensurePolling();
     } on DownloadApiException catch (error) {
-      if (mounted) setState(() => _error = error.message);
+      if (!mounted) return;
+      setState(() {
+        if (error.statusCode == 410) {
+          _warning = error.message;
+        } else {
+          _error = error.message;
+        }
+      });
     } catch (_) {
       if (mounted) {
         setState(() => _error = 'Could not reach the download server.');
@@ -460,6 +478,10 @@ class _DownloadPageState extends State<DownloadPage> {
       if (_error != null) ...[
         const SizedBox(height: 16),
         _ErrorBanner(message: _error!),
+      ],
+      if (_warning != null) ...[
+        const SizedBox(height: 16),
+        _WarningBanner(message: _warning!),
       ],
     ];
   }
@@ -907,6 +929,37 @@ class _ErrorBanner extends StatelessWidget {
               message,
               style: TextStyle(color: scheme.onErrorContainer),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WarningBanner extends StatelessWidget {
+  const _WarningBanner({required this.message});
+
+  final String message;
+
+  // M3 has no amber scheme slot; fixed amber pair, legible in both themes.
+  static const _bg = Color(0xFFFFF3CD);
+  static const _fg = Color(0xFF664D03);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: _fg, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(message, style: const TextStyle(color: _fg)),
           ),
         ],
       ),
