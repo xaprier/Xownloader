@@ -24,6 +24,7 @@ class DownloadRequest(BaseModel):
     output_format: OutputFormat = OutputFormat.MP4
     video_quality: str | None = Field(default=None, pattern=r"^[0-9]{3,4}p$")
     audio_bitrate: str | None = Field(default=None, pattern=r"^[0-9]{2,3}K$")
+    media_selection: list[int] | None = None
 
 
 class PreviewRequest(BaseModel):
@@ -42,6 +43,15 @@ class PreviewResponse(BaseModel):
     allowed_audio_bitrates: list[str]
 
 
+class JobArtifact(BaseModel):
+    index: int
+    media_type: str
+    file_name: str
+    display_name: str
+    file_size_bytes: int | None = None
+    file_path: Path | None = Field(default=None, exclude=True)
+
+
 class DownloadJob(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     source_url: HttpUrl
@@ -49,6 +59,7 @@ class DownloadJob(BaseModel):
     output_format: OutputFormat
     video_quality: str | None = None
     audio_bitrate: str | None = None
+    media_selection: list[int] | None = None
     status: JobStatus = JobStatus.QUEUED
     progress_percent: float = 0
     error: str | None = None
@@ -62,3 +73,4 @@ class DownloadJob(BaseModel):
     completed_at: datetime | None = None
     expires_at: datetime | None = None
     file_path: Path | None = Field(default=None, exclude=True)
+    artifacts: list[JobArtifact] = Field(default_factory=list)

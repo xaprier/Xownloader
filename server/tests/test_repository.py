@@ -40,8 +40,91 @@ def test_v1_database_migrates_to_current_schema(tmp_path: Path) -> None:
 
     assert version == CURRENT_SCHEMA_VERSION
     columns = {row[1] for row in repository._connection.execute("PRAGMA table_info(jobs)")}
-    assert {"cleanup_attempts", "last_cleanup_error", "title", "display_name"} <= columns
+    assert {
+        "cleanup_attempts",
+        "last_cleanup_error",
+        "title",
+        "display_name",
+        "media_selection",
+    } <= columns
+    tables = {
+        row[0]
+        for row in repository._connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )
+    }
+    assert "job_artifacts" in tables
     repository.close()
+
+
+def test_artifacts_round_trip(tmp_path: Path) -> None:
+    from xownloader_server.models import DownloadJob, JobArtifact, OutputFormat
+
+    repo = JobRepository(tmp_path / "jobs.db")
+    job = DownloadJob(
+        source_url="https://www.instagram.com/p/Cxxxx/",
+        provider="instagram",
+        output_format=OutputFormat.MP4,
+        media_selection=[0, 2],
+        artifacts=[
+            JobArtifact(
+                index=0,
+                media_type="image",
+                file_name="j_0.jpg",
+                display_name="Trip (1).jpg",
+                file_size_bytes=10,
+                file_path=tmp_path / "j_0.jpg",
+            ),
+            JobArtifact(
+                index=2,
+                media_type="video",
+                file_name="j_2.mp4",
+                display_name="Trip (3).mp4",
+                file_size_bytes=20,
+                file_path=tmp_path / "j_2.mp4",
+            ),
+        ],
+    )
+    repo.save(job)
+    repo.close()
+
+    reopened = JobRepository(tmp_path / "jobs.db")
+    loaded = reopened.get(job.id)
+    assert loaded is not None
+    assert loaded.media_selection == [0, 2]
+    assert [a.index for a in loaded.artifacts] == [0, 2]
+    assert loaded.artifacts[1].display_name == "Trip (3).mp4"
+    assert loaded.artifacts[0].file_path == tmp_path / "j_0.jpg"
+    reopened.close()
+
+
+def test_legacy_job_without_artifact_rows_gets_a_synthetic_artifact(tmp_path: Path) -> None:
+    from xownloader_server.models import DownloadJob, JobStatus, OutputFormat
+
+    repo = JobRepository(tmp_path / "jobs.db")
+    job = DownloadJob(
+        source_url="https://youtu.be/example",
+        output_format=OutputFormat.MP4,
+        status=JobStatus.COMPLETED,
+        title="Legacy Video",
+        display_name="Legacy Video.mp4",
+        file_name="opaque.mp4",
+        file_path=tmp_path / "opaque.mp4",
+        file_size_bytes=99,
+    )
+    job.artifacts = []
+    repo.save(job)
+    repo.close()
+
+    reopened = JobRepository(tmp_path / "jobs.db")
+    loaded = reopened.get(job.id)
+    assert loaded is not None
+    assert len(loaded.artifacts) == 1
+    assert loaded.artifacts[0].index == 0
+    assert loaded.artifacts[0].file_name == "opaque.mp4"
+    assert loaded.artifacts[0].display_name == "Legacy Video.mp4"
+    assert loaded.artifacts[0].media_type == "video"
+    reopened.close()
 
 
 def test_persists_title_and_display_name(tmp_path: Path) -> None:

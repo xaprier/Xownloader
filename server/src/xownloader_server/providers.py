@@ -21,8 +21,8 @@ class ProviderAdapter(Protocol):
         job: DownloadJob,
         output_directory: Path,
         progress_callback: ProgressCallback,
-    ) -> Path:
-        """Download a job and return the published file path."""
+    ) -> list[Path]:
+        """Download a job and return the published file paths, primary first."""
 
     async def inspect(self, source_url: HttpUrl) -> dict[str, object]:
         """Return provider metadata without downloading media."""
@@ -55,7 +55,7 @@ class YtDlpAdapter:
         job: DownloadJob,
         output_directory: Path,
         progress_callback: ProgressCallback,
-    ) -> Path:
+    ) -> list[Path]:
         output_directory.mkdir(parents=True, exist_ok=True)
         output_template = output_directory / f"{job.id}.%(ext)s"
         command = [
@@ -111,4 +111,4 @@ class YtDlpAdapter:
         )
         if not candidates:
             raise RuntimeError("yt-dlp completed without producing an output file")
-        return candidates[0]
+        return [candidates[0]]
