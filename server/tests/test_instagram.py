@@ -4,6 +4,8 @@ from xownloader_server.errors import PolicyViolation, PreviewUnavailable
 from xownloader_server.instagram import (
     InstagramAdapter,
     InstagramApiError,
+    InstagramSource,
+    parse_source,
     shortcode_from_url,
     shortcode_to_pk,
 )
@@ -119,9 +121,37 @@ def test_shortcode_from_url_accepts_post_reel_tv():
     assert shortcode_from_url("https://www.instagram.com/tv/Cghi3/") == "Cghi3"
 
 
-def test_shortcode_from_url_rejects_profile_and_stories():
-    with pytest.raises(PolicyViolation):
-        shortcode_from_url("https://www.instagram.com/nasa/")
+def test_parse_source_classifies_every_url_form():
+    assert parse_source("https://www.instagram.com/p/Cabc-1/") == InstagramSource(
+        kind="post", shortcode="Cabc-1"
+    )
+    assert parse_source("https://instagram.com/reel/Cdef_2/?hl=en") == InstagramSource(
+        kind="post", shortcode="Cdef_2"
+    )
+    assert parse_source(
+        "https://www.instagram.com/stories/highlights/18107691199400742/"
+    ) == InstagramSource(kind="highlight", highlight_id="18107691199400742")
+    assert parse_source(
+        "https://www.instagram.com/stories/nbakolej/3980885535123917366/"
+    ) == InstagramSource(kind="story", username="nbakolej", story_pk="3980885535123917366")
+    assert parse_source("https://www.instagram.com/stories/nbakolej/") == InstagramSource(
+        kind="story", username="nbakolej"
+    )
+
+
+def test_parse_source_rejects_unsupported_urls():
+    for url in (
+        "https://www.instagram.com/nasa/",
+        "https://www.instagram.com/explore/tags/space/",
+        "https://www.instagram.com/stories/",
+        "https://example.com/p/abc/",
+    ):
+        with pytest.raises(PolicyViolation):
+            parse_source(url)
+
+
+def test_shortcode_from_url_still_rejects_non_posts():
+    assert shortcode_from_url("https://www.instagram.com/p/Cabc-1/") == "Cabc-1"
     with pytest.raises(PolicyViolation):
         shortcode_from_url("https://www.instagram.com/stories/nasa/12345/")
 
@@ -156,6 +186,15 @@ async def test_inspect_video():
     assert meta["media_items"][0]["type"] == "video"
     assert meta["media_items"][0]["duration_seconds"] == 12
     assert meta["thumbnail"] == "https://cdn.example/cover.jpg"
+
+
+@pytest.mark.asyncio
+async def test_load_dispatches_post_to_media_info():
+    adapter = _adapter(_CAROUSEL)
+    nodes, title, uploader = await adapter._load(parse_source("https://www.instagram.com/p/Ccar/"))
+    assert [n.get("media_type") for n in nodes] == [1, 2, 1]
+    assert title == "Trip"
+    assert uploader == "nasa"
 
 
 @pytest.mark.asyncio
@@ -267,3 +306,217 @@ async def test_download_rejects_out_of_range_selection(tmp_path):
     job = _carousel_job(media_selection=[0, 9])
     with pytest.raises(RuntimeError, match="media item 9"):
         await adapter.download(job, tmp_path, _record([]))
+
+
+_HIGHLIGHT = {
+    "reels_media": [
+        {
+            "id": "highlight:18107691199400742",
+            "title": "Summer",
+            "user": {"username": "nbakolej"},
+            "items": [
+                {
+                    "pk": "111",
+                    "media_type": 1,
+                    "image_versions2": {
+                        "candidates": [
+                            {"url": "https://cdn.example/h1.jpg", "width": 1080, "height": 1920}
+                        ]
+                    },
+                },
+                {
+                    "pk": "222",
+                    "media_type": 2,
+                    "image_versions2": {
+                        "candidates": [
+                            {"url": "https://cdn.example/h2c.jpg", "width": 720, "height": 1280}
+                        ]
+                    },
+                    "video_versions": [
+                        {"url": "https://cdn.example/h2.mp4", "width": 720, "height": 1280}
+                    ],
+                    "video_duration": 5.0,
+                },
+            ],
+        }
+    ]
+}
+
+_HIGHLIGHT_URL_STR = "https://www.instagram.com/stories/highlights/18107691199400742/"
+
+
+@pytest.mark.asyncio
+async def test_inspect_highlight_enumerates_items():
+    meta = await _adapter(_HIGHLIGHT).inspect(_HIGHLIGHT_URL_STR)
+    assert meta["title"] == "Summer"
+    assert meta["uploader"] == "nbakolej"
+    assert [m["type"] for m in meta["media_items"]] == ["image", "video"]
+    assert meta["media_items"][1]["duration_seconds"] == 5
+
+
+@pytest.mark.asyncio
+async def test_download_highlight_selected_items(tmp_path):
+    adapter = _download_adapter(payload=_HIGHLIGHT)
+    job = DownloadJob.model_validate(
+        {
+            "source_url": _HIGHLIGHT_URL_STR,
+            "provider": "instagram",
+            "output_format": "mp4",
+            "media_selection": [1],
+        }
+    )
+    paths = await adapter.download(job, tmp_path, _record([]))
+    assert [p.name for p in paths] == [f"{job.id}_1.mp4"]
+    assert job.title == "Summer"
+
+
+@pytest.mark.asyncio
+async def test_inspect_highlight_removed_raises_content_unavailable():
+    from xownloader_server.errors import ProviderContentUnavailable
+
+    adapter = _adapter({"reels_media": []})
+    with pytest.raises(ProviderContentUnavailable, match="highlight is unavailable"):
+        await adapter.inspect(_HIGHLIGHT_URL_STR)
+
+
+_STORY_REEL = {
+    "reels_media": [
+        {
+            "id": "38074396807",
+            "user": {"username": "nbakolej"},
+            "items": [
+                {
+                    "pk": "3980885535123917366",
+                    "media_type": 1,
+                    "image_versions2": {
+                        "candidates": [
+                            {"url": "https://cdn.example/s1.jpg", "width": 1080, "height": 1920}
+                        ]
+                    },
+                },
+                {
+                    "pk": "3980885535123917999",
+                    "media_type": 2,
+                    "image_versions2": {
+                        "candidates": [
+                            {"url": "https://cdn.example/s2c.jpg", "width": 720, "height": 1280}
+                        ]
+                    },
+                    "video_versions": [
+                        {"url": "https://cdn.example/s2.mp4", "width": 720, "height": 1280}
+                    ],
+                    "video_duration": 9.0,
+                },
+            ],
+        }
+    ]
+}
+_PROFILE = {"user": {"pk": "38074396807", "username": "nbakolej"}}
+_STORY_ALL = "https://www.instagram.com/stories/nbakolej/"
+_STORY_ONE = "https://www.instagram.com/stories/nbakolej/3980885535123917366/"
+
+
+def _story_adapter(*, profile=_PROFILE, reel=_STORY_REEL, profile_error=None):
+    calls = {"profile": 0, "reels": 0, "profile_path": None}
+
+    async def fetch_json(path):
+        if "usernameinfo" in path:
+            calls["profile"] += 1
+            calls["profile_path"] = path
+            if profile_error is not None:
+                raise profile_error
+            return profile
+        if "reels_media" in path:
+            calls["reels"] += 1
+            return reel
+        raise AssertionError(f"unexpected path {path}")
+
+    async def fetch_bytes(url):
+        return b"s"
+
+    async def sleep(_seconds):
+        return None
+
+    adapter = InstagramAdapter(
+        "sessionid=abc; csrftoken=xyz",
+        fetch_json=fetch_json,
+        fetch_bytes=fetch_bytes,
+        sleep=sleep,
+    )
+    return adapter, calls
+
+
+@pytest.mark.asyncio
+async def test_inspect_story_all_active_items():
+    adapter, _ = _story_adapter()
+    meta = await adapter.inspect(_STORY_ALL)
+    assert meta["title"] == "Story by nbakolej"
+    assert meta["uploader"] == "nbakolej"
+    assert [m["type"] for m in meta["media_items"]] == ["image", "video"]
+
+
+@pytest.mark.asyncio
+async def test_inspect_story_single_item_filters_by_pk():
+    adapter, _ = _story_adapter()
+    meta = await adapter.inspect(_STORY_ONE)
+    assert [m["index"] for m in meta["media_items"]] == [0]
+    assert meta["media_items"][0]["type"] == "image"
+
+
+@pytest.mark.asyncio
+async def test_story_uid_is_resolved_via_usernameinfo_and_cached():
+    adapter, calls = _story_adapter()
+    await adapter.inspect(_STORY_ALL)
+    await adapter.inspect(_STORY_ALL)
+    assert calls["profile"] == 1
+    assert calls["reels"] == 2
+    assert "/api/v1/users/nbakolej/usernameinfo/" in calls["profile_path"]
+
+
+@pytest.mark.asyncio
+async def test_inspect_story_expired_raises_content_unavailable():
+    from xownloader_server.errors import ProviderContentUnavailable
+
+    adapter, _ = _story_adapter(reel={"reels_media": []})
+    with pytest.raises(ProviderContentUnavailable, match="expired"):
+        await adapter.inspect(_STORY_ALL)
+
+
+@pytest.mark.asyncio
+async def test_inspect_story_missing_pk_raises_content_unavailable():
+    from xownloader_server.errors import ProviderContentUnavailable
+
+    adapter, _ = _story_adapter()
+    with pytest.raises(ProviderContentUnavailable, match="no longer available"):
+        await adapter.inspect("https://www.instagram.com/stories/nbakolej/999999/")
+
+
+@pytest.mark.asyncio
+async def test_inspect_story_private_account_raises_content_unavailable():
+    from xownloader_server.errors import ProviderContentUnavailable
+
+    adapter, _ = _story_adapter(profile_error=InstagramApiError(404, "not found"))
+    with pytest.raises(ProviderContentUnavailable, match="not accessible"):
+        await adapter.inspect(_STORY_ALL)
+
+
+@pytest.mark.asyncio
+async def test_inspect_story_session_error_stays_preview_unavailable():
+    adapter, _ = _story_adapter(profile_error=InstagramApiError(403, "login_required"))
+    with pytest.raises(PreviewUnavailable, match="session is invalid"):
+        await adapter.inspect(_STORY_ALL)
+
+
+@pytest.mark.asyncio
+async def test_download_story_single_item(tmp_path):
+    adapter, _ = _story_adapter()
+    job = DownloadJob.model_validate(
+        {
+            "source_url": _STORY_ONE,
+            "provider": "instagram",
+            "output_format": "mp4",
+        }
+    )
+    paths = await adapter.download(job, tmp_path, _record([]))
+    assert [p.name for p in paths] == [f"{job.id}_0.jpg"]
+    assert job.title == "Story by nbakolej"

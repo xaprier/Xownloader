@@ -1,7 +1,11 @@
 from pydantic import HttpUrl
 
 from xownloader_server.config import Settings
-from xownloader_server.errors import PolicyViolation, PreviewUnavailable
+from xownloader_server.errors import (
+    PolicyViolation,
+    PreviewUnavailable,
+    ProviderContentUnavailable,
+)
 from xownloader_server.models import (
     PreviewMediaItem,
     PreviewRequest,
@@ -35,7 +39,7 @@ class PreviewService:
         adapter = self.registry.adapter_for(provider)
         try:
             metadata = await adapter.inspect(request.source_url)
-        except PreviewUnavailable:
+        except (PreviewUnavailable, ProviderContentUnavailable, PolicyViolation):
             raise
         except Exception as error:  # noqa: BLE001
             raise PreviewUnavailable("The provider metadata could not be loaded") from error
