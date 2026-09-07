@@ -20,6 +20,10 @@ while download policy and retention remain server-owned.
    period.
 7. Cleanup removes expired files and records the cleanup result.
 
+A provider is chosen from the source URL host: a `ProviderRegistry` maps each known host
+to an adapter. A single request can produce more than one output file — a job carries a
+list of artifacts, and a YouTube job is simply a one-artifact job.
+
 The API should remain provider-neutral even though the first provider is YouTube. Provider
 adapters must not own HTTP routes, client state, or retention policy.
 
@@ -30,16 +34,23 @@ adapters must not own HTTP routes, client state, or retention policy.
 - A completed file cannot exceed the configured maximum size and receives an expiration time.
 - Cleanup runs periodically and removes expired files; clients never decide retention.
 - Provider adapters are the only layer allowed to know how a provider is downloaded.
+- Instagram is a second provider adapter for single public posts and reels. It requires a
+  server-configured account cookie (`XOWNLOADER_INSTAGRAM_COOKIE`); without one, Instagram
+  URLs are rejected. Carousel posts produce one artifact per selected media item, each
+  addressable at `/api/v1/downloads/{id}/media/{index}`. Profile, story, highlight, and
+  comment retrieval are out of scope.
 - Job metadata is persisted in SQLite; interrupted jobs are marked failed during startup
    rather than silently disappearing.
 - The provider adapter reports progress to the job manager; operational endpoints expose
    liveness, readiness, and counters without exposing provider internals to clients.
 - Access control uses instance API tokens rather than user accounts: client scope is for
    download operations, while admin scope is required for all-job and operational views.
-- The completed-file routes (`/api/v1/downloads/{id}/file` and `/file/{name}`) are
+- The completed-file routes (`/api/v1/downloads/{id}/file`, `/file/{name}`, and the
+   per-artifact `/api/v1/downloads/{id}/media/{index}` / `.../media/{index}/{name}`) are
    unauthenticated: the unguessable job id is the capability and retention expiry bounds
    exposure. The trailing name segment is decorative so browsers and download managers
-   save the file under the original video title; the server serves the file by id.
+   save the file under the original title; the server serves the file by id and index.
+   The `/file` routes resolve to artifact index 0.
 - SQLite schema changes are versioned and cleanup failures remain persisted for a later
    retry instead of being silently discarded.
 

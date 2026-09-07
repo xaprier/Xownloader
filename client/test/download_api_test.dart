@@ -66,6 +66,47 @@ void main() {
     );
   });
 
+  test('createDownload includes media_selection when provided', () async {
+    final client = FakeHttpClient(_jobJson);
+    final api = DownloadApi(baseUrl: 'http://localhost:8000/', client: client);
+
+    await api.createDownload(
+      sourceUrl: 'https://www.instagram.com/p/Cxxxx/',
+      outputFormat: 'mp4',
+      mediaSelection: [0, 2],
+    );
+
+    final request = client.lastRequest! as http.Request;
+    expect(jsonDecode(request.body), {
+      'source_url': 'https://www.instagram.com/p/Cxxxx/',
+      'output_format': 'mp4',
+      'media_selection': [0, 2],
+    });
+  });
+
+  test('mediaUri builds an indexed capability path', () {
+    final api = DownloadApi(baseUrl: 'http://host:8000');
+    expect(
+      api.mediaUri('job-1', 2, displayName: 'Trip (3).mp4').toString(),
+      'http://host:8000/api/v1/downloads/job-1/media/2/Trip%20(3).mp4',
+    );
+    expect(
+      api.mediaUri('job-1', 0).toString(),
+      'http://host:8000/api/v1/downloads/job-1/media/0',
+    );
+  });
+
+  test('parses a preview with instagram media items', () async {
+    final client = FakeHttpClient(_instagramPreviewJson);
+    final api = DownloadApi(baseUrl: 'http://localhost:8000/', client: client);
+
+    final preview = await api.preview('https://www.instagram.com/p/Cxxxx/');
+
+    expect(preview.provider, 'instagram');
+    expect(preview.mediaItems, isNotNull);
+    expect(preview.mediaItems!.map((m) => m.type).toList(), ['image', 'video']);
+  });
+
   test('previews a URL before creating a download', () async {
     final client = FakeHttpClient(_previewJson);
     final api = DownloadApi(
@@ -89,6 +130,24 @@ const _jobJson = '''
   "output_format": "mp4",
   "status": "queued",
   "progress_percent": 0
+}
+''';
+
+const _instagramPreviewJson = '''
+{
+  "source_url": "https://www.instagram.com/p/Cxxxx/",
+  "provider": "instagram",
+  "title": "Trip",
+  "thumbnail": null,
+  "uploader": "nasa",
+  "duration_seconds": null,
+  "media_items": [
+    {"index": 0, "type": "image", "thumbnail": null, "width": 1080, "height": 1080, "duration_seconds": null},
+    {"index": 1, "type": "video", "thumbnail": null, "width": 720, "height": 720, "duration_seconds": 8}
+  ],
+  "allowed_output_formats": [],
+  "allowed_video_qualities": [],
+  "allowed_audio_bitrates": []
 }
 ''';
 

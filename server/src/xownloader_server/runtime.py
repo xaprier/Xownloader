@@ -13,6 +13,7 @@ class RuntimeStatus(TypedDict):
     ffprobe: bool
     output_directory: bool
     disk_reserve: bool
+    instagram_configured: bool
 
 
 def check_runtime(settings: Settings) -> RuntimeStatus:
@@ -36,6 +37,7 @@ def check_runtime(settings: Settings) -> RuntimeStatus:
         "ffprobe": ffprobe_ready,
         "output_directory": output_directory_ready,
         "disk_reserve": disk_reserve_ready,
+        "instagram_configured": settings.instagram_cookie is not None,
     }
 
 

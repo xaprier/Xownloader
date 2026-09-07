@@ -146,6 +146,7 @@ class _DownloadPageState extends State<DownloadPage> {
   MediaPreview? _preview;
   Timer? _pollTimer;
   StreamSubscription<String>? _shareSubscription;
+  Set<int> _selectedMedia = {};
   String _format = 'mp4';
   String? _quality;
   String? _audioBitrate;
@@ -178,7 +179,7 @@ class _DownloadPageState extends State<DownloadPage> {
   Future<void> _inspectUrl() async {
     final sourceUrl = _urlController.text.trim();
     if (sourceUrl.isEmpty) {
-      setState(() => _error = 'Enter a YouTube URL.');
+      setState(() => _error = 'Enter a YouTube or Instagram URL.');
       return;
     }
     setState(() {
@@ -188,7 +189,12 @@ class _DownloadPageState extends State<DownloadPage> {
     try {
       final preview = await widget.api.preview(sourceUrl);
       if (!mounted) return;
-      setState(() => _preview = preview);
+      setState(() {
+        _preview = preview;
+        _selectedMedia = preview.mediaItems == null
+            ? {}
+            : preview.mediaItems!.map((item) => item.index).toSet();
+      });
     } on DownloadApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
@@ -226,17 +232,20 @@ class _DownloadPageState extends State<DownloadPage> {
       _submitting = true;
     });
     try {
+      final isCarousel = _preview!.isCarouselCapable;
       final job = await widget.api.createDownload(
         sourceUrl: sourceUrl,
         outputFormat: _format,
-        videoQuality: _quality,
-        audioBitrate: _audioBitrate,
+        videoQuality: isCarousel ? null : _quality,
+        audioBitrate: isCarousel ? null : _audioBitrate,
+        mediaSelection: isCarousel ? _orderedSelection() : null,
       );
       if (!mounted) return;
       final title = _preview?.title;
       setState(() {
         _jobs.insert(0, _QueuedJob(job, title));
         _preview = null;
+        _selectedMedia = {};
         _quality = null;
         _audioBitrate = null;
         _format = 'mp4';
@@ -294,6 +303,14 @@ class _DownloadPageState extends State<DownloadPage> {
     if (index != -1) _jobs[index] = _jobs[index].withJob(updated);
   }
 
+  List<int> _orderedSelection() {
+    final items = _preview?.mediaItems ?? const [];
+    return [
+      for (final item in items)
+        if (_selectedMedia.contains(item.index)) item.index,
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -324,7 +341,7 @@ class _DownloadPageState extends State<DownloadPage> {
   List<Widget> _buildComposer(BuildContext context) {
     return [
       Text(
-        'Download YouTube media',
+        'Download media',
         style: Theme.of(context).textTheme.headlineMedium,
       ),
       const SizedBox(height: 8),
@@ -333,7 +350,9 @@ class _DownloadPageState extends State<DownloadPage> {
       TextField(
         controller: _urlController,
         keyboardType: TextInputType.url,
-        decoration: const InputDecoration(labelText: 'YouTube URL'),
+        decoration: const InputDecoration(
+          labelText: 'YouTube or Instagram URL',
+        ),
         onSubmitted: (_) => _inspectUrl(),
       ),
       const SizedBox(height: 16),
@@ -345,7 +364,38 @@ class _DownloadPageState extends State<DownloadPage> {
               : const Icon(Icons.search),
           label: Text(_submitting ? 'Inspecting...' : 'Inspect URL'),
         )
-      else ...[
+      else if (_preview!.isCarouselCapable) ...[
+        _PreviewCard(preview: _preview!),
+        const SizedBox(height: 8),
+        for (final item in _preview!.mediaItems!)
+          CheckboxListTile(
+            value: _selectedMedia.contains(item.index),
+            onChanged: (checked) => setState(() {
+              if (checked ?? false) {
+                _selectedMedia.add(item.index);
+              } else {
+                _selectedMedia.remove(item.index);
+              }
+            }),
+            title: Text('Item ${item.index + 1} · ${item.type}'),
+            subtitle: item.durationSeconds != null
+                ? Text(formatDuration(item.durationSeconds))
+                : null,
+            secondary: Icon(
+              item.type == 'video' ? Icons.videocam : Icons.image,
+            ),
+          ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: (_submitting || _selectedMedia.isEmpty)
+              ? null
+              : _addToQueue,
+          icon: _submitting
+              ? const _ButtonSpinner()
+              : const Icon(Icons.playlist_add),
+          label: Text(_submitting ? 'Submitting...' : 'Add to queue'),
+        ),
+      ] else ...[
         _PreviewCard(preview: _preview!),
         const SizedBox(height: 16),
         Wrap(
@@ -738,11 +788,41 @@ class _JobCard extends StatelessWidget {
           Text('You cancelled this download.', style: muted),
         ];
       case DownloadStatus.completed:
+        final artifacts = job.artifacts;
+        if (artifacts.length <= 1) {
+          final only = artifacts.isEmpty ? null : artifacts.first;
+          return [
+            const SizedBox(height: 12),
+            ResultActions(
+              fileUri: only == null
+                  ? api.fileUri(job.id, displayName: job.displayName)
+                  : api.mediaUri(
+                      job.id,
+                      only.index,
+                      displayName: only.displayName,
+                    ),
+            ),
+          ];
+        }
         return [
           const SizedBox(height: 12),
-          ResultActions(
-            fileUri: api.fileUri(job.id, displayName: job.displayName),
-          ),
+          for (final artifact in artifacts) ...[
+            Text(
+              artifact.displayName,
+              style: Theme.of(context).textTheme.bodySmall,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            ResultActions(
+              fileUri: api.mediaUri(
+                job.id,
+                artifact.index,
+                displayName: artifact.displayName,
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
         ];
     }
   }

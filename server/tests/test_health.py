@@ -21,6 +21,12 @@ def test_readiness_reports_runtime_dependencies() -> None:
     assert "disk_reserve" in payload.get("detail", payload)
 
 
+def test_ready_reports_instagram_not_configured_by_default() -> None:
+    payload = client.get("/ready").json()
+    payload = payload.get("detail", payload)
+    assert payload["instagram_configured"] is False
+
+
 def test_metrics_exposes_download_counters() -> None:
     response = client.get("/metrics")
 

@@ -50,6 +50,42 @@ def test_policy_rejects_disabled_audio_bitrate(tmp_path: Path) -> None:
         )
 
 
+def test_policy_returns_provider_name_for_youtube(tmp_path: Path) -> None:
+    policy = ServerPolicy(Settings(download_directory=tmp_path, min_free_disk_mb=0))
+    provider = policy.validate_source_url(
+        DownloadRequest.model_validate({"source_url": "https://youtu.be/example"}).source_url
+    )
+    assert provider == "youtube"
+
+
+def test_policy_rejects_instagram_when_not_configured(tmp_path: Path) -> None:
+    policy = ServerPolicy(Settings(download_directory=tmp_path, min_free_disk_mb=0))
+    with pytest.raises(PolicyViolation, match="Instagram is not configured"):
+        policy.validate_source_url(
+            DownloadRequest.model_validate(
+                {"source_url": "https://www.instagram.com/p/Cxxxx/"}
+            ).source_url
+        )
+
+
+def test_policy_accepts_instagram_when_configured(tmp_path: Path) -> None:
+    from pydantic import SecretStr
+
+    policy = ServerPolicy(
+        Settings(
+            download_directory=tmp_path,
+            min_free_disk_mb=0,
+            instagram_cookie=SecretStr("sessionid=abc; csrftoken=xyz"),
+        )
+    )
+    provider = policy.validate_source_url(
+        DownloadRequest.model_validate(
+            {"source_url": "https://www.instagram.com/p/Cxxxx/"}
+        ).source_url
+    )
+    assert provider == "instagram"
+
+
 def test_rate_limiter_rejects_requests_after_limit() -> None:
     limiter = RateLimiter(requests_per_minute=1)
     limiter.check("127.0.0.1")

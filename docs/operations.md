@@ -36,6 +36,21 @@ curl -s   http://localhost:8000/ready   # expect "ready": true
   `XOWNLOADER_DATABASE_PATH` are fixed by compose and should not be overridden.
 - `docker compose down` stops the server; the bind-mounted data survives.
 
+## Instagram provider
+
+The Instagram adapter needs a logged-in account cookie in
+`XOWNLOADER_INSTAGRAM_COOKIE`. Obtain it from a browser session (F12 -> Network ->
+an `instagram.com` request -> Request Headers -> `Cookie`). It expires after days
+to weeks; when Instagram previews start returning "session is invalid or
+expired", refresh it.
+
+This is intended for a self-hosted instance with few users. A shared account
+used for high-volume automated access is more likely to hit a challenge or a
+block - use a dedicated account, and raise
+`XOWNLOADER_INSTAGRAM_DOWNLOAD_DELAY_SECONDS` if downloads are being throttled.
+`GET /ready` reports `instagram_configured` but does not call Instagram; cookie
+validity surfaces on the first real request.
+
 ## Configuration
 
 Copy `server/.env.example` to `server/.env` and set deployment-specific values. At minimum,

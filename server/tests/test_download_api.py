@@ -19,3 +19,17 @@ def test_non_youtube_download_is_rejected() -> None:
 
     assert response.status_code == 400
     assert "Only YouTube" in response.json()["detail"]
+
+
+def test_media_selection_is_rejected_for_youtube() -> None:
+    response = client.post(
+        "/api/v1/downloads",
+        json={
+            "source_url": "https://youtu.be/example",
+            "output_format": "mp4",
+            "media_selection": [0, 1],
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Media selection is only valid for Instagram" in response.json()["detail"]

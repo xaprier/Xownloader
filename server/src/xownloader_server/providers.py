@@ -21,8 +21,8 @@ class ProviderAdapter(Protocol):
         job: DownloadJob,
         output_directory: Path,
         progress_callback: ProgressCallback,
-    ) -> Path:
-        """Download a job and return the published file path."""
+    ) -> list[Path]:
+        """Download a job and return the published file paths, primary first."""
 
     async def inspect(self, source_url: HttpUrl) -> dict[str, object]:
         """Return provider metadata without downloading media."""
@@ -48,14 +48,23 @@ class YtDlpAdapter:
         if process.returncode != 0:
             message = stderr.decode(errors="replace").strip()[-1000:]
             raise RuntimeError(message or "yt-dlp metadata inspection failed")
-        return json.loads(stdout)
+        raw = json.loads(stdout)
+        duration = raw.get("duration")
+        return {
+            "provider": "youtube",
+            "title": str(raw.get("title") or "Untitled media"),
+            "uploader": raw.get("uploader") or raw.get("channel"),
+            "thumbnail": raw.get("thumbnail"),
+            "duration_seconds": int(duration) if isinstance(duration, (int, float)) else None,
+            "media_items": None,
+        }
 
     async def download(
         self,
         job: DownloadJob,
         output_directory: Path,
         progress_callback: ProgressCallback,
-    ) -> Path:
+    ) -> list[Path]:
         output_directory.mkdir(parents=True, exist_ok=True)
         output_template = output_directory / f"{job.id}.%(ext)s"
         command = [
@@ -111,4 +120,4 @@ class YtDlpAdapter:
         )
         if not candidates:
             raise RuntimeError("yt-dlp completed without producing an output file")
-        return candidates[0]
+        return [candidates[0]]
