@@ -153,3 +153,21 @@ def test_preview_route_maps_content_unavailable_to_410(monkeypatch) -> None:
     )
     assert response.status_code == 410
     assert "expired" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_preview_service_raises_policy_violation_for_malformed_story(tmp_path) -> None:
+    from xownloader_server.errors import PolicyViolation
+
+    service = PreviewService(
+        Settings(
+            download_directory=tmp_path,
+            min_free_disk_mb=0,
+            instagram_cookie=SecretStr("sessionid=a; csrftoken=b"),
+        )
+    )
+    with pytest.raises(PolicyViolation):
+        await service.inspect(
+            PreviewRequest.model_validate({"source_url": "https://www.instagram.com/stories/"}),
+            client_key="k",
+        )
