@@ -189,6 +189,15 @@ async def test_inspect_video():
 
 
 @pytest.mark.asyncio
+async def test_load_dispatches_post_to_media_info():
+    adapter = _adapter(_CAROUSEL)
+    nodes, title, uploader = await adapter._load(parse_source("https://www.instagram.com/p/Ccar/"))
+    assert [n.get("media_type") for n in nodes] == [1, 2, 1]
+    assert title == "Trip"
+    assert uploader == "nasa"
+
+
+@pytest.mark.asyncio
 async def test_inspect_carousel_enumerates_items():
     meta = await _adapter(_CAROUSEL).inspect("https://www.instagram.com/p/Ccar/")
     assert [m["type"] for m in meta["media_items"]] == ["image", "video", "image"]

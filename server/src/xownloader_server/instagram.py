@@ -11,7 +11,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from xownloader_server.errors import PolicyViolation, PreviewUnavailable
+from xownloader_server.errors import (
+    PolicyViolation,
+    PreviewUnavailable,
+    ProviderContentUnavailable,
+)
 from xownloader_server.models import DownloadJob
 
 _POST_URL = re.compile(r"instagram\.com/(?:p|reel|reels|tv)/([A-Za-z0-9_-]+)")
@@ -101,21 +105,27 @@ class InstagramAdapter:
         return match.group(1) if match else ""
 
     async def inspect(self, source_url: Any) -> dict[str, Any]:
-        item = await self._load_item(str(source_url))
-        nodes = item.get("carousel_media") or [item]
+        nodes, title, uploader = await self._load(parse_source(str(source_url)))
         media_items = [self._media_item(index, node) for index, node in enumerate(nodes)]
         thumbnail = media_items[0]["thumbnail"] if media_items else None
         return {
             "provider": "instagram",
-            "title": self._title(item),
-            "uploader": (item.get("user") or {}).get("username"),
+            "title": title,
+            "uploader": uploader,
             "thumbnail": thumbnail,
             "duration_seconds": None,
             "media_items": media_items,
         }
 
-    async def _load_item(self, source_url: str) -> dict[str, Any]:
-        pk = shortcode_to_pk(shortcode_from_url(source_url))
+    async def _load(self, source: InstagramSource) -> tuple[list[dict[str, Any]], str, str | None]:
+        if source.kind == "post":
+            return await self._load_post(source.shortcode)
+        if source.kind == "highlight":
+            return await self._load_highlight(source.highlight_id)
+        return await self._load_story(source.username, source.story_pk)
+
+    async def _load_post(self, shortcode: str) -> tuple[list[dict[str, Any]], str, str | None]:
+        pk = shortcode_to_pk(shortcode)
         try:
             payload = await self._fetch_json(f"/api/v1/media/{pk}/info/")
         except InstagramApiError as error:
@@ -123,7 +133,19 @@ class InstagramAdapter:
         items = payload.get("items") or []
         if not items:
             raise PreviewUnavailable("Post not found or not public")
-        return items[0]
+        item = items[0]
+        nodes = item.get("carousel_media") or [item]
+        return nodes, self._title(item), (item.get("user") or {}).get("username")
+
+    async def _load_highlight(
+        self, highlight_id: str
+    ) -> tuple[list[dict[str, Any]], str, str | None]:
+        raise ProviderContentUnavailable("Highlights are not available yet")
+
+    async def _load_story(
+        self, username: str, story_pk: str | None
+    ) -> tuple[list[dict[str, Any]], str, str | None]:
+        raise ProviderContentUnavailable("Stories are not available yet")
 
     @staticmethod
     def _preview_error(error: InstagramApiError) -> PreviewUnavailable:
@@ -177,9 +199,8 @@ class InstagramAdapter:
         progress_callback: Callable[[float], Awaitable[None]],
     ) -> list[Path]:
         output_directory.mkdir(parents=True, exist_ok=True)
-        item = await self._load_item(str(job.source_url))
-        job.title = self._title(item)
-        nodes = item.get("carousel_media") or [item]
+        nodes, title, _uploader = await self._load(parse_source(str(job.source_url)))
+        job.title = title
 
         selection = (
             job.media_selection if job.media_selection is not None else list(range(len(nodes)))
@@ -187,8 +208,7 @@ class InstagramAdapter:
         for index in selection:
             if index < 0 or index >= len(nodes):
                 raise RuntimeError(
-                    f"Selected media item {index} is out of range for this post "
-                    f"({len(nodes)} items)"
+                    f"Selected media item {index} is out of range ({len(nodes)} items)"
                 )
 
         paths: list[Path] = []
