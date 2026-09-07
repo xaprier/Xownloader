@@ -25,6 +25,11 @@ _STORY_USER_URL = re.compile(r"instagram\.com/stories/([^/?#]+)/?(?:$|[?#])")
 _B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 _APP_ID = "936619743392459"
 _MEDIA_VIDEO = 2
+_DESKTOP_UA = "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0"
+# `web_profile_info` (the usual username -> id lookup) is hard rate-limited; the
+# mobile `usernameinfo` endpoint is not, but it rejects a browser UA with
+# "useragent mismatch", so that one call goes out with an app UA instead.
+_MOBILE_UA = "Instagram 275.0.0.27.98 Android"
 
 
 @dataclass(frozen=True)
@@ -188,13 +193,17 @@ class InstagramAdapter:
         if cached:
             return cached
         try:
-            payload = await self._fetch_json(f"/api/v1/users/web_profile_info/?username={username}")
+            payload = await self._fetch_json(f"/api/v1/users/{username}/usernameinfo/")
         except InstagramApiError as error:
             if error.status in (401, 403, 429):
                 raise self._preview_error(error) from error
             raise ProviderContentUnavailable("This account's stories are not accessible") from error
-        user = ((payload.get("data") or {}).get("user")) or payload.get("user") or {}
-        uid = user.get("id") or user.get("pk")
+        if payload.get("status") == "fail":
+            raise ProviderContentUnavailable(
+                "Instagram would not return this account right now, try again later"
+            )
+        user = payload.get("user") or (payload.get("data") or {}).get("user") or {}
+        uid = user.get("pk") or user.get("id")
         if not uid:
             raise ProviderContentUnavailable("This account could not be found")
         resolved = str(uid)
@@ -286,15 +295,14 @@ class InstagramAdapter:
         return paths
 
     async def _default_fetch_json(self, path: str) -> dict[str, Any]:
+        user_agent = _MOBILE_UA if "/usernameinfo/" in path else _DESKTOP_UA
         request = urllib.request.Request(
             "https://www.instagram.com" + path,
             headers={
                 "x-ig-app-id": _APP_ID,
                 "x-csrftoken": self._csrf,
                 "x-requested-with": "XMLHttpRequest",
-                "User-Agent": (
-                    "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0"
-                ),
+                "User-Agent": user_agent,
                 "Referer": "https://www.instagram.com/",
                 "Sec-Fetch-Site": "same-origin",
                 "Cookie": self._cookie,

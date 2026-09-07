@@ -411,17 +411,18 @@ _STORY_REEL = {
         }
     ]
 }
-_PROFILE = {"data": {"user": {"id": "38074396807", "username": "nbakolej"}}}
+_PROFILE = {"user": {"pk": "38074396807", "username": "nbakolej"}}
 _STORY_ALL = "https://www.instagram.com/stories/nbakolej/"
 _STORY_ONE = "https://www.instagram.com/stories/nbakolej/3980885535123917366/"
 
 
 def _story_adapter(*, profile=_PROFILE, reel=_STORY_REEL, profile_error=None):
-    calls = {"profile": 0, "reels": 0}
+    calls = {"profile": 0, "reels": 0, "profile_path": None}
 
     async def fetch_json(path):
-        if "web_profile_info" in path:
+        if "usernameinfo" in path:
             calls["profile"] += 1
+            calls["profile_path"] = path
             if profile_error is not None:
                 raise profile_error
             return profile
@@ -463,12 +464,13 @@ async def test_inspect_story_single_item_filters_by_pk():
 
 
 @pytest.mark.asyncio
-async def test_story_uid_is_cached_across_calls():
+async def test_story_uid_is_resolved_via_usernameinfo_and_cached():
     adapter, calls = _story_adapter()
     await adapter.inspect(_STORY_ALL)
     await adapter.inspect(_STORY_ALL)
     assert calls["profile"] == 1
     assert calls["reels"] == 2
+    assert "/api/v1/users/nbakolej/usernameinfo/" in calls["profile_path"]
 
 
 @pytest.mark.asyncio
