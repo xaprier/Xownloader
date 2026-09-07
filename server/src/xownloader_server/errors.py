@@ -18,5 +18,9 @@ class PreviewUnavailable(Exception):
     """Raised when provider metadata cannot be inspected."""
 
 
+class ProviderContentUnavailable(Exception):
+    """The URL was understood but the content is gone, private, or empty."""
+
+
 class JobNotFound(Exception):
     """Raised when a requested job does not exist."""

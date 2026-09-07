@@ -15,6 +15,7 @@ from xownloader_server.errors import (
     JobNotFound,
     PolicyViolation,
     PreviewUnavailable,
+    ProviderContentUnavailable,
     QueueFull,
     RateLimitExceeded,
 )
@@ -97,6 +98,11 @@ async def create_preview(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=str(error),
             headers={"Retry-After": "60"},
+        ) from error
+    except ProviderContentUnavailable as error:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail=str(error),
         ) from error
     except PreviewUnavailable as error:
         raise HTTPException(

@@ -111,3 +111,45 @@ def test_preview_rejects_instagram_when_server_has_no_cookie() -> None:
     )
     assert response.status_code == 400
     assert "Instagram is not configured" in response.json()["detail"]
+
+
+class _UnavailableAdapter:
+    name = "instagram"
+
+    async def inspect(self, source_url):
+        from xownloader_server.errors import ProviderContentUnavailable
+
+        raise ProviderContentUnavailable("This story has expired or is no longer available")
+
+
+@pytest.mark.asyncio
+async def test_content_unavailable_propagates_from_preview_service(tmp_path: Path) -> None:
+    from xownloader_server.errors import ProviderContentUnavailable
+
+    service = PreviewService(
+        Settings(download_directory=tmp_path, min_free_disk_mb=0),
+        registry=ProviderRegistry.with_adapters({"instagram": _UnavailableAdapter()}),
+    )
+    with pytest.raises(ProviderContentUnavailable):
+        await service.inspect(
+            PreviewRequest.model_validate(
+                {"source_url": "https://www.instagram.com/stories/nasa/123/"}
+            ),
+            client_key="k",
+        )
+
+
+def test_preview_route_maps_content_unavailable_to_410(monkeypatch) -> None:
+    from xownloader_server import main
+    from xownloader_server.errors import ProviderContentUnavailable
+
+    async def _raise(_payload, _client_key):
+        raise ProviderContentUnavailable("No active stories, or they have expired")
+
+    monkeypatch.setattr(main.app.state.preview_service, "inspect", _raise)
+    response = TestClient(main.app).post(
+        "/api/v1/previews",
+        json={"source_url": "https://www.instagram.com/stories/nasa/"},
+    )
+    assert response.status_code == 410
+    assert "expired" in response.json()["detail"]
