@@ -186,7 +186,7 @@ async def cancel_download(
         ) from error
 
 
-def _download_response(job_id: UUID) -> FileResponse:
+def _download_response(job_id: UUID, index: int = 0) -> FileResponse:
     try:
         job = job_manager.get_job(job_id)
     except JobNotFound as error:
@@ -194,9 +194,17 @@ def _download_response(job_id: UUID) -> FileResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Download not found",
         ) from error
-    if job.status.value != "completed" or not job.file_path or not job.file_path.exists():
+    if job.status.value != "completed":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Download is not ready")
-    return FileResponse(path=job.file_path, filename=job.display_name or job.file_name)
+    artifact = next((item for item in job.artifacts if item.index == index), None)
+    if artifact is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media item not found")
+    if not artifact.file_path or not artifact.file_path.exists():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Download is not ready")
+    return FileResponse(
+        path=artifact.file_path,
+        filename=artifact.display_name or artifact.file_name,
+    )
 
 
 @app.get("/api/v1/downloads/{job_id}/file", response_class=FileResponse, tags=["downloads"])
@@ -213,3 +221,22 @@ def download_file(job_id: UUID) -> FileResponse:
 def download_file_named(job_id: UUID, filename: str) -> FileResponse:
     # `filename` is decorative so downloaders save a friendly name; its value is ignored.
     return _download_response(job_id)
+
+
+@app.get(
+    "/api/v1/downloads/{job_id}/media/{index}",
+    response_class=FileResponse,
+    tags=["downloads"],
+)
+def download_media(job_id: UUID, index: int) -> FileResponse:
+    return _download_response(job_id, index)
+
+
+@app.get(
+    "/api/v1/downloads/{job_id}/media/{index}/{filename}",
+    response_class=FileResponse,
+    tags=["downloads"],
+)
+def download_media_named(job_id: UUID, index: int, filename: str) -> FileResponse:
+    # `filename` is decorative; the artifact is served by index.
+    return _download_response(job_id, index)
