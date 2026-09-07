@@ -38,6 +38,7 @@ class DownloadApi {
     required String outputFormat,
     String? videoQuality,
     String? audioBitrate,
+    List<int>? mediaSelection,
   }) async {
     final payload = <String, dynamic>{
       'source_url': sourceUrl,
@@ -45,6 +46,7 @@ class DownloadApi {
     };
     if (videoQuality != null) payload['video_quality'] = videoQuality;
     if (audioBitrate != null) payload['audio_bitrate'] = audioBitrate;
+    if (mediaSelection != null) payload['media_selection'] = mediaSelection;
     final response = await _client.post(
       _uri('/api/v1/downloads'),
       headers: _headers,
@@ -75,6 +77,14 @@ class DownloadApi {
       return _uri('$base/$jobId/file');
     }
     return _uri('$base/$jobId/file/${Uri.encodeComponent(displayName)}');
+  }
+
+  Uri mediaUri(String jobId, int index, {String? displayName}) {
+    const base = '/api/v1/downloads';
+    if (displayName == null || displayName.isEmpty) {
+      return _uri('$base/$jobId/media/$index');
+    }
+    return _uri('$base/$jobId/media/$index/${Uri.encodeComponent(displayName)}');
   }
 
   Map<String, String> get _headers => {
