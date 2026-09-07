@@ -28,6 +28,11 @@ client implementation for Android, iOS, Linux, macOS, Windows, and web.
 
 The client server URL is configured in `client/.env` using the
 `XOWNLOADER_SERVER_URL` variable. Copy `client/.env.example` before running or building.
+The value must include the scheme (`http://127.0.0.1:8000`, not `127.0.0.1:8000`) — a
+scheme-less value parses as a URI scheme and the client cannot reach the server. On an
+Android emulator use `http://10.0.2.2:8000`; a physical device or a distributed build
+needs the machine's LAN address or the HTTPS deployment. `.env` is bundled at build time,
+so a change needs a rebuild or a full restart, not a hot reload.
 
 ```bash
 cd client
@@ -44,12 +49,19 @@ The client theme (System/Light/Dark) is a local per-device preference stored wit
 changing the brand art with `dart run flutter_launcher_icons` (config in
 `client/flutter_launcher_icons.yaml`).
 
-The client can run several downloads at once — the Active tab holds the new-download
-composer and running jobs, the Done tab holds finished ones. Job history is per-session
-and not persisted. Completed files are served from unauthenticated capability URLs
-(`/api/v1/downloads/{id}/file` and `/file/{name}`); the unguessable job id plus retention
-expiry are the guard, and the trailing name segment lets browsers and download managers
-save the file under the original video title.
+The client can run several downloads at once. The new-download composer and every job —
+running or finished — share a single scrolling queue surface; job history is per-session
+and not persisted. Pasting a YouTube URL offers format and quality options; an Instagram
+carousel, highlight, or story set instead lists its media items with checkboxes so the
+user picks which to download. Completed files are served from unauthenticated capability
+URLs — `/api/v1/downloads/{id}/file` (and `/file/{name}`) for a single file, and
+`/api/v1/downloads/{id}/media/{index}` (`.../media/{index}/{name}`) for one artifact of a
+multi-item job. The unguessable job id plus retention expiry are the guard, and the
+trailing name segment lets browsers and download managers save the file under its
+original title.
+
+An Instagram story or highlight that is expired, removed, or empty comes back from the
+preview as `410`; the client shows that as an amber warning rather than a red error.
 
 ### Platform notes
 

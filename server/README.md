@@ -1,20 +1,27 @@
 # Xownloader Server
 
-The server is a FastAPI application. It owns URL validation, `yt-dlp` execution, job
-state, file delivery, and retention cleanup. YouTube is the first provider; provider
-adapters keep future integrations such as Instagram outside the shared API models.
+The server is a FastAPI application. It owns URL validation, provider execution, job
+state, file delivery, and retention cleanup. A `ProviderRegistry` picks the provider from
+the URL host: YouTube through `yt-dlp`, and Instagram (posts, reels, carousels, stories,
+highlights) through a direct HTTP adapter that needs `XOWNLOADER_INSTAGRAM_COOKIE`.
+Provider adapters stay behind the shared, provider-neutral API models.
 
 ## API resources
 
 - `GET /health` checks service availability.
 - `GET /ready` checks runtime dependencies, output storage, and disk reserve.
 - `GET /metrics` exposes basic Prometheus-compatible job counters.
-- `POST /api/v1/previews` inspects a YouTube URL without creating a download job.
-- `POST /api/v1/downloads` validates a YouTube request and queues a job.
+- `POST /api/v1/previews` inspects a URL without creating a job; returns output options
+  for YouTube, or the list of media items for an Instagram carousel, highlight, or story
+  set. Returns `410` when an Instagram story or highlight is expired, removed, or empty.
+- `POST /api/v1/downloads` validates a request and queues a job; an Instagram request may
+  carry `media_selection` (the item indices to download).
 - `GET /api/v1/downloads` lists persisted job state.
-- `GET /api/v1/downloads/{id}` returns job status, progress, and retention metadata.
+- `GET /api/v1/downloads/{id}` returns job status, progress, and retention metadata,
+  including one `artifacts` entry per output file.
 - `DELETE /api/v1/downloads/{id}` cancels a queued or active job.
-- `GET /api/v1/downloads/{id}/file` returns a completed file.
+- `GET /api/v1/downloads/{id}/file` returns the first completed file;
+  `GET /api/v1/downloads/{id}/media/{index}` returns one artifact of a multi-item job.
 - `GET /api/v1/admin/jobs` lists all jobs for administrators.
 - `GET /api/v1/admin/status` exposes runtime, queue, and storage status for administrators.
 

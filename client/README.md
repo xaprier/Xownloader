@@ -11,16 +11,21 @@ Copy the environment template before running the application:
 cp .env.example .env
 ```
 
-Set `XOWNLOADER_SERVER_URL` to the server API origin. The default points to a local
-development server at `http://127.0.0.1:8000`. Do not commit `.env`.
+Set `XOWNLOADER_SERVER_URL` to the server API origin, **with the scheme** — use
+`http://127.0.0.1:8000`, not `127.0.0.1:8000`. An Android emulator reaches the host at
+`http://10.0.2.2:8000`; a physical device or a distributed build needs a LAN address or
+the HTTPS deployment. `.env` is bundled at build time, so a change needs a rebuild or a
+full restart. Do not commit `.env`.
 
 Set `XOWNLOADER_CLIENT_API_TOKEN` when the server runs in production. The client uses
 the token for download creation, status polling, cancellation, and file retrieval.
 
-The current screen uses a preview-first flow: Enter/Inspect loads YouTube metadata and
-server-approved options without creating a job. The user then selects MP4/MP3, video
-quality, and audio bitrate before explicitly starting the download. Progress polling,
-error display, cancellation, and the completed file URL are supported after submission.
+The screen uses a preview-first flow. Inspect loads metadata without creating a job: for
+YouTube the user then picks MP4/MP3, video quality, and audio bitrate; for an Instagram
+carousel, highlight, or story set it lists the media items with checkboxes so the user
+picks which to download. Progress polling, cancellation, and per-file result links follow
+submission. A failed request shows a red error; an expired or empty Instagram story or
+highlight shows an amber warning instead.
 
 ## Share intent
 

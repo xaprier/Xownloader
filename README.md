@@ -1,9 +1,10 @@
 # Xownloader
 
 Xownloader is a cross-platform media downloader built around a self-hosted backend.
-It downloads YouTube media through `yt-dlp` and single public Instagram posts and
-reels through a dedicated adapter. Instagram support requires a server-configured
-account cookie; without one, Instagram URLs are rejected and YouTube is unaffected.
+It downloads YouTube media through `yt-dlp`, and public Instagram posts, reels,
+stories, and highlights through a dedicated adapter. Instagram support requires a
+server-configured account cookie; without one, Instagram URLs are rejected and
+YouTube is unaffected.
 
 ## Project shape
 
@@ -22,14 +23,17 @@ place while allowing one client codebase to target mobile and desktop platforms.
 - Accept a YouTube or Instagram URL from the Flutter client; the server picks the
   provider from the URL host.
 - Let the server select the available format according to its configuration
-  (YouTube). Instagram serves the post's own media as-is.
-- For an Instagram carousel, preview the media items, let the user pick a subset,
-  and expose one file per selected item.
+  (YouTube). Instagram serves the source media as-is.
+- Instagram: a single post or reel, a highlight, a single story, or a user's
+  active stories. For carousels, highlights, and story sets the preview lists the
+  items so the user picks which to download, one file per selected item.
+- When an Instagram story or highlight is expired, removed, or empty, the preview
+  returns `410` and the client shows it as a warning rather than an error.
 - Track download state and expose the resulting file(s) to the requesting client.
 - Remove completed files after the configured retention period.
 - Keep provider-specific integrations behind the server boundary.
 
-Instagram profile, story, highlight, and comment retrieval are out of scope.
+Instagram profile feeds and comment retrieval are out of scope.
 
 ## Requirements
 
@@ -94,10 +98,11 @@ branches with reviewed merges for repository contributions.
 
 ## Development status
 
-The repository currently contains the initial monorepo structure, a policy-controlled
-REST API foundation with SQLite job persistence, and a generated Flutter client starter.
-The next implementation slice is authentication, progress reporting, and client
-integration. Tests and client features should be added with each slice.
+Version 2.x: YouTube plus Instagram posts, reels, carousels, stories, and highlights,
+with token-scoped auth, SQLite job persistence, progress reporting, retention cleanup,
+and a Flutter client for all targets. Operational endpoints (`/api/v1/admin/*`,
+`/metrics`) exist on the server; a dedicated admin surface in the client is planned for a
+later version.
 
 ## License
 

@@ -51,6 +51,18 @@ block - use a dedicated account, and raise
 `GET /ready` reports `instagram_configured` but does not call Instagram; cookie
 validity surfaces on the first real request.
 
+Supported URL shapes: a post or reel (`/p/`, `/reel/`, `/tv/`), a highlight
+(`/stories/highlights/<id>/`), a single story (`/stories/<user>/<pk>/`), and a
+user's active stories (`/stories/<user>/`). Story requests resolve the account's
+numeric id from the `usernameinfo` endpoint and cache it until restart; the older
+`web_profile_info` lookup is rate-limited and is not used.
+
+Error vs warning: a genuine failure (invalid session, network, Instagram rate
+limit, malformed URL) returns `400`/`401`/`403`/`429`/`5xx`. A story or highlight
+that is expired, removed, private, or empty returns `410` — the client shows this
+as a warning, not an error. If every story request returns `429`, the account is
+being throttled; back off and retry later.
+
 ## Configuration
 
 Copy `server/.env.example` to `server/.env` and set deployment-specific values. At minimum,
