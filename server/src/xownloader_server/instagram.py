@@ -98,6 +98,7 @@ class InstagramAdapter:
         self._fetch_json = fetch_json or self._default_fetch_json
         self._fetch_bytes = fetch_bytes or self._default_fetch_bytes
         self._sleep = sleep or asyncio.sleep
+        self._uid_cache: dict[str, str] = {}
 
     @staticmethod
     def _csrf_token(cookie: str) -> str:
@@ -167,7 +168,38 @@ class InstagramAdapter:
     async def _load_story(
         self, username: str, story_pk: str | None
     ) -> tuple[list[dict[str, Any]], str, str | None]:
-        raise ProviderContentUnavailable("Stories are not available yet")
+        uid = await self._resolve_uid(username)
+        try:
+            payload = await self._fetch_json(f"/api/v1/feed/reels_media/?reel_ids={uid}")
+        except InstagramApiError as error:
+            raise self._preview_error(error) from error
+        reel = self._first_reel(payload)
+        items = (reel or {}).get("items") or []
+        if not items:
+            raise ProviderContentUnavailable("No active stories, or they have expired")
+        if story_pk is not None:
+            items = [node for node in items if str(node.get("pk")) == story_pk]
+            if not items:
+                raise ProviderContentUnavailable("This story has expired or is no longer available")
+        return items, f"Story by {username}", username
+
+    async def _resolve_uid(self, username: str) -> str:
+        cached = self._uid_cache.get(username)
+        if cached:
+            return cached
+        try:
+            payload = await self._fetch_json(f"/api/v1/users/web_profile_info/?username={username}")
+        except InstagramApiError as error:
+            if error.status in (401, 403, 429):
+                raise self._preview_error(error) from error
+            raise ProviderContentUnavailable("This account's stories are not accessible") from error
+        user = ((payload.get("data") or {}).get("user")) or payload.get("user") or {}
+        uid = user.get("id") or user.get("pk")
+        if not uid:
+            raise ProviderContentUnavailable("This account could not be found")
+        resolved = str(uid)
+        self._uid_cache[username] = resolved
+        return resolved
 
     @staticmethod
     def _preview_error(error: InstagramApiError) -> PreviewUnavailable:

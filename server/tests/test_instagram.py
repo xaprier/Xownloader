@@ -377,3 +377,144 @@ async def test_inspect_highlight_removed_raises_content_unavailable():
     adapter = _adapter({"reels_media": []})
     with pytest.raises(ProviderContentUnavailable, match="highlight is unavailable"):
         await adapter.inspect(_HIGHLIGHT_URL_STR)
+
+
+_STORY_REEL = {
+    "reels_media": [
+        {
+            "id": "38074396807",
+            "user": {"username": "nbakolej"},
+            "items": [
+                {
+                    "pk": "3980885535123917366",
+                    "media_type": 1,
+                    "image_versions2": {
+                        "candidates": [
+                            {"url": "https://cdn.example/s1.jpg", "width": 1080, "height": 1920}
+                        ]
+                    },
+                },
+                {
+                    "pk": "3980885535123917999",
+                    "media_type": 2,
+                    "image_versions2": {
+                        "candidates": [
+                            {"url": "https://cdn.example/s2c.jpg", "width": 720, "height": 1280}
+                        ]
+                    },
+                    "video_versions": [
+                        {"url": "https://cdn.example/s2.mp4", "width": 720, "height": 1280}
+                    ],
+                    "video_duration": 9.0,
+                },
+            ],
+        }
+    ]
+}
+_PROFILE = {"data": {"user": {"id": "38074396807", "username": "nbakolej"}}}
+_STORY_ALL = "https://www.instagram.com/stories/nbakolej/"
+_STORY_ONE = "https://www.instagram.com/stories/nbakolej/3980885535123917366/"
+
+
+def _story_adapter(*, profile=_PROFILE, reel=_STORY_REEL, profile_error=None):
+    calls = {"profile": 0, "reels": 0}
+
+    async def fetch_json(path):
+        if "web_profile_info" in path:
+            calls["profile"] += 1
+            if profile_error is not None:
+                raise profile_error
+            return profile
+        if "reels_media" in path:
+            calls["reels"] += 1
+            return reel
+        raise AssertionError(f"unexpected path {path}")
+
+    async def fetch_bytes(url):
+        return b"s"
+
+    async def sleep(_seconds):
+        return None
+
+    adapter = InstagramAdapter(
+        "sessionid=abc; csrftoken=xyz",
+        fetch_json=fetch_json,
+        fetch_bytes=fetch_bytes,
+        sleep=sleep,
+    )
+    return adapter, calls
+
+
+@pytest.mark.asyncio
+async def test_inspect_story_all_active_items():
+    adapter, _ = _story_adapter()
+    meta = await adapter.inspect(_STORY_ALL)
+    assert meta["title"] == "Story by nbakolej"
+    assert meta["uploader"] == "nbakolej"
+    assert [m["type"] for m in meta["media_items"]] == ["image", "video"]
+
+
+@pytest.mark.asyncio
+async def test_inspect_story_single_item_filters_by_pk():
+    adapter, _ = _story_adapter()
+    meta = await adapter.inspect(_STORY_ONE)
+    assert [m["index"] for m in meta["media_items"]] == [0]
+    assert meta["media_items"][0]["type"] == "image"
+
+
+@pytest.mark.asyncio
+async def test_story_uid_is_cached_across_calls():
+    adapter, calls = _story_adapter()
+    await adapter.inspect(_STORY_ALL)
+    await adapter.inspect(_STORY_ALL)
+    assert calls["profile"] == 1
+    assert calls["reels"] == 2
+
+
+@pytest.mark.asyncio
+async def test_inspect_story_expired_raises_content_unavailable():
+    from xownloader_server.errors import ProviderContentUnavailable
+
+    adapter, _ = _story_adapter(reel={"reels_media": []})
+    with pytest.raises(ProviderContentUnavailable, match="expired"):
+        await adapter.inspect(_STORY_ALL)
+
+
+@pytest.mark.asyncio
+async def test_inspect_story_missing_pk_raises_content_unavailable():
+    from xownloader_server.errors import ProviderContentUnavailable
+
+    adapter, _ = _story_adapter()
+    with pytest.raises(ProviderContentUnavailable, match="no longer available"):
+        await adapter.inspect("https://www.instagram.com/stories/nbakolej/999999/")
+
+
+@pytest.mark.asyncio
+async def test_inspect_story_private_account_raises_content_unavailable():
+    from xownloader_server.errors import ProviderContentUnavailable
+
+    adapter, _ = _story_adapter(profile_error=InstagramApiError(404, "not found"))
+    with pytest.raises(ProviderContentUnavailable, match="not accessible"):
+        await adapter.inspect(_STORY_ALL)
+
+
+@pytest.mark.asyncio
+async def test_inspect_story_session_error_stays_preview_unavailable():
+    adapter, _ = _story_adapter(profile_error=InstagramApiError(403, "login_required"))
+    with pytest.raises(PreviewUnavailable, match="session is invalid"):
+        await adapter.inspect(_STORY_ALL)
+
+
+@pytest.mark.asyncio
+async def test_download_story_single_item(tmp_path):
+    adapter, _ = _story_adapter()
+    job = DownloadJob.model_validate(
+        {
+            "source_url": _STORY_ONE,
+            "provider": "instagram",
+            "output_format": "mp4",
+        }
+    )
+    paths = await adapter.download(job, tmp_path, _record([]))
+    assert [p.name for p in paths] == [f"{job.id}_0.jpg"]
+    assert job.title == "Story by nbakolej"
