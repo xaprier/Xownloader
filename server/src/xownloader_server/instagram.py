@@ -140,7 +140,29 @@ class InstagramAdapter:
     async def _load_highlight(
         self, highlight_id: str
     ) -> tuple[list[dict[str, Any]], str, str | None]:
-        raise ProviderContentUnavailable("Highlights are not available yet")
+        try:
+            payload = await self._fetch_json(
+                f"/api/v1/feed/reels_media/?reel_ids=highlight%3A{highlight_id}"
+            )
+        except InstagramApiError as error:
+            raise self._preview_error(error) from error
+        reel = self._first_reel(payload)
+        items = (reel or {}).get("items") or []
+        if not items:
+            raise ProviderContentUnavailable("This highlight is unavailable or was removed")
+        return (
+            items,
+            reel.get("title") or "Highlight",
+            (reel.get("user") or {}).get("username"),
+        )
+
+    @staticmethod
+    def _first_reel(payload: dict[str, Any]) -> dict[str, Any] | None:
+        reels = payload.get("reels_media")
+        if reels:
+            return reels[0]
+        reels_map = payload.get("reels") or {}
+        return next(iter(reels_map.values()), None)
 
     async def _load_story(
         self, username: str, story_pk: str | None

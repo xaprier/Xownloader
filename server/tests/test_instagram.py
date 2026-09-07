@@ -306,3 +306,74 @@ async def test_download_rejects_out_of_range_selection(tmp_path):
     job = _carousel_job(media_selection=[0, 9])
     with pytest.raises(RuntimeError, match="media item 9"):
         await adapter.download(job, tmp_path, _record([]))
+
+
+_HIGHLIGHT = {
+    "reels_media": [
+        {
+            "id": "highlight:18107691199400742",
+            "title": "Summer",
+            "user": {"username": "nbakolej"},
+            "items": [
+                {
+                    "pk": "111",
+                    "media_type": 1,
+                    "image_versions2": {
+                        "candidates": [
+                            {"url": "https://cdn.example/h1.jpg", "width": 1080, "height": 1920}
+                        ]
+                    },
+                },
+                {
+                    "pk": "222",
+                    "media_type": 2,
+                    "image_versions2": {
+                        "candidates": [
+                            {"url": "https://cdn.example/h2c.jpg", "width": 720, "height": 1280}
+                        ]
+                    },
+                    "video_versions": [
+                        {"url": "https://cdn.example/h2.mp4", "width": 720, "height": 1280}
+                    ],
+                    "video_duration": 5.0,
+                },
+            ],
+        }
+    ]
+}
+
+_HIGHLIGHT_URL_STR = "https://www.instagram.com/stories/highlights/18107691199400742/"
+
+
+@pytest.mark.asyncio
+async def test_inspect_highlight_enumerates_items():
+    meta = await _adapter(_HIGHLIGHT).inspect(_HIGHLIGHT_URL_STR)
+    assert meta["title"] == "Summer"
+    assert meta["uploader"] == "nbakolej"
+    assert [m["type"] for m in meta["media_items"]] == ["image", "video"]
+    assert meta["media_items"][1]["duration_seconds"] == 5
+
+
+@pytest.mark.asyncio
+async def test_download_highlight_selected_items(tmp_path):
+    adapter = _download_adapter(payload=_HIGHLIGHT)
+    job = DownloadJob.model_validate(
+        {
+            "source_url": _HIGHLIGHT_URL_STR,
+            "provider": "instagram",
+            "output_format": "mp4",
+            "media_selection": [1],
+        }
+    )
+    paths = await adapter.download(job, tmp_path, _record([]))
+    assert [p.name for p in paths] == [f"{job.id}_1.mp4"]
+    assert job.title == "Summer"
+
+
+@pytest.mark.asyncio
+async def test_inspect_highlight_removed_raises_content_unavailable():
+    from xownloader_server.errors import ProviderContentUnavailable
+
+    adapter = _adapter({"reels_media": []})
+    with pytest.raises(ProviderContentUnavailable, match="highlight is unavailable"):
+        await adapter.inspect(_HIGHLIGHT_URL_STR)
