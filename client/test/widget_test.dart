@@ -101,6 +101,23 @@ void main() {
     expect(find.text('Server: http://127.0.0.1:8000'), findsOneWidget);
   });
 
+  testWidgets('shows the branded title and the supported-links hint', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(MyApp(themeController: await _loadedController()));
+
+    expect(
+      find.image(const AssetImage('assets/icon/logo_mark.png')),
+      findsOneWidget,
+    );
+    expect(find.text('SUPPORTED LINKS'), findsOneWidget);
+    expect(
+      find.textContaining('pick which items to download'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('starts in the mode the controller reports', (tester) async {
     SharedPreferences.setMockInitialValues({'theme_mode': 'light'});
     await tester.pumpWidget(MyApp(themeController: await _loadedController()));

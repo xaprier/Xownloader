@@ -333,7 +333,19 @@ class _DownloadPageState extends State<DownloadPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Xownloader'),
+        titleSpacing: 12,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/icon/logo_mark.png',
+              height: 26,
+              filterQuality: FilterQuality.medium,
+            ),
+            const SizedBox(width: 10),
+            const Text('Xownloader'),
+          ],
+        ),
         actions: [ThemeModeMenu(controller: widget.themeController)],
       ),
       body: Center(
@@ -370,18 +382,24 @@ class _DownloadPageState extends State<DownloadPage> {
         keyboardType: TextInputType.url,
         decoration: const InputDecoration(
           labelText: 'YouTube or Instagram URL',
+          helperText:
+              'youtube.com/watch · youtu.be · instagram.com/p · /reel · /stories',
+          helperMaxLines: 2,
         ),
         onSubmitted: (_) => _inspectUrl(),
       ),
       const SizedBox(height: 16),
-      if (_preview == null)
+      if (_preview == null) ...[
+        const _SupportedLinks(),
+        const SizedBox(height: 16),
         FilledButton.icon(
           onPressed: _submitting ? null : _inspectUrl,
           icon: _submitting
               ? const _ButtonSpinner()
               : const Icon(Icons.search),
           label: Text(_submitting ? 'Inspecting...' : 'Inspect URL'),
-        )
+        ),
+      ]
       else if (_preview!.isCarouselCapable) ...[
         _PreviewCard(preview: _preview!),
         const SizedBox(height: 8),
@@ -870,6 +888,82 @@ class _CancelButton extends StatelessWidget {
 }
 
 /// A quiet outlined panel for the empty-queue placeholder.
+/// Quiet reference panel shown before the first inspect, so a new user knows
+/// which links work.
+class _SupportedLinks extends StatelessWidget {
+  const _SupportedLinks();
+
+  static const _rows = <(String, String, String)>[
+    ('YouTube', 'video or short', 'youtube.com/watch?v=… · youtu.be/…'),
+    ('Instagram', 'post or reel', 'instagram.com/p/… · instagram.com/reel/…'),
+    ('Instagram', 'story or highlight', 'instagram.com/stories/…'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'SUPPORTED LINKS',
+            style: text.labelSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.1,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 10),
+          for (final (provider, what, example) in _rows)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: provider,
+                          style: text.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        TextSpan(
+                          text: '  $what',
+                          style: text.bodyMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    example,
+                    style: text.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Text(
+            'Carousels and highlights let you pick which items to download.',
+            style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _EmptyQueueFrame extends StatelessWidget {
   const _EmptyQueueFrame({required this.child});
 
