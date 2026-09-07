@@ -21,6 +21,7 @@ from xownloader_server.errors import (
 from xownloader_server.jobs import JobManager
 from xownloader_server.models import DownloadJob, DownloadRequest, PreviewRequest, PreviewResponse
 from xownloader_server.previews import PreviewService
+from xownloader_server.registry import build_registry
 from xownloader_server.runtime import check_runtime
 
 app = FastAPI(
@@ -55,8 +56,9 @@ async def lifespan(_: FastAPI):
         job_manager.close()
 
 
-job_manager = JobManager(settings)
-preview_service = PreviewService(settings)
+provider_registry = build_registry(settings)
+job_manager = JobManager(settings, registry=provider_registry)
+preview_service = PreviewService(settings, registry=provider_registry)
 app.state.preview_service = preview_service
 app.router.lifespan_context = lifespan
 

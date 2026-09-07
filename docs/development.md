@@ -17,6 +17,10 @@ download counters for monitoring.
 To run the server in a container instead: `cd server && docker compose up -d --build`
 (FFmpeg is bundled). See [operations.md](operations.md#container) for details.
 
+Set `XOWNLOADER_INSTAGRAM_COOKIE` to enable the Instagram provider; see
+[operations.md](operations.md#instagram-provider). Without it, Instagram URLs are rejected
+and YouTube is unaffected.
+
 ## Flutter client
 
 Install the Flutter stable channel and follow `client/README.md`. Flutter is the single

@@ -1,8 +1,9 @@
 # Xownloader
 
 Xownloader is a cross-platform media downloader built around a self-hosted backend.
-The first release focuses on downloading YouTube media through `yt-dlp`; Instagram
-support is planned as a later feature and is intentionally outside the initial scope.
+It downloads YouTube media through `yt-dlp` and single public Instagram posts and
+reels through a dedicated adapter. Instagram support requires a server-configured
+account cookie; without one, Instagram URLs are rejected and YouTube is unaffected.
 
 ## Project shape
 
@@ -16,16 +17,19 @@ The Flutter client communicates with the server instead of running `yt-dlp` dire
 This keeps download policy, output formats, storage, authentication, and cleanup in one
 place while allowing one client codebase to target mobile and desktop platforms.
 
-## Initial scope
+## Scope
 
-- Accept a YouTube URL from the Flutter client.
-- Let the server select the available format according to its configuration.
-- Track download state and expose the resulting file to the requesting client.
+- Accept a YouTube or Instagram URL from the Flutter client; the server picks the
+  provider from the URL host.
+- Let the server select the available format according to its configuration
+  (YouTube). Instagram serves the post's own media as-is.
+- For an Instagram carousel, preview the media items, let the user pick a subset,
+  and expose one file per selected item.
+- Track download state and expose the resulting file(s) to the requesting client.
 - Remove completed files after the configured retention period.
 - Keep provider-specific integrations behind the server boundary.
 
-Instagram is a post-MVP integration. Its API, authentication, legal, and provider
-limitations will be reviewed before implementation.
+Instagram profile, story, highlight, and comment retrieval are out of scope.
 
 ## Requirements
 
