@@ -39,6 +39,29 @@ curl -s   http://localhost:8000/ready   # expect "ready": true
   point into the bind-mounted `/data` volume or the session will not survive a restart.
 - `docker compose down` stops the server; the bind-mounted data survives.
 
+## Reverse proxy
+
+`server/nginx.example.conf` is a full, working nginx config (TLS termination,
+API/health/metrics proxying, static hosting for the Flutter web build) with every
+deployment-specific value replaced by a `YOUR_*` placeholder — copy it to
+`/etc/nginx/sites-available/<your-domain>`, fill in the placeholders (each one is
+explained in the file's header comment), symlink it into `sites-enabled`, obtain a
+certificate (e.g. `certbot --nginx -d YOUR_DOMAIN`), and reload nginx.
+
+Two details worth knowing before adapting it for a different setup:
+
+- The `/api/` block injects a fixed Bearer token **only when the incoming request
+  carries no `Authorization` header of its own** — this is what lets the web build
+  ship with no client token embedded in its JavaScript. Overriding the header
+  unconditionally (instead of only filling in the blank) silently breaks the admin
+  panel, since it discards the real admin token the user entered and replaces it
+  with the client one on every request — admin endpoints then 401 no matter what
+  token is used client-side.
+- JS/wasm/font files are matched to `Cache-Control: no-cache`, not a long `expires`.
+  Unlike most static assets, these are not content-hashed in their URL, so a long
+  cache means a returning visitor can keep an old build's `MaterialIcons-*.otf`
+  (and therefore be missing any icon added since) for the full cache lifetime.
+
 ## Instagram provider
 
 The Instagram adapter authenticates via [instagrapi](https://github.com/subzeroid/instagrapi)
@@ -97,7 +120,8 @@ production deployments should set:
 - `XOWNLOADER_CORS_ALLOWED_ORIGINS`
 
 Never use wildcard CORS or commit `.env` files. Keep client and admin tokens separate.
-Terminate TLS at the deployment proxy or application gateway.
+Terminate TLS at the deployment proxy or application gateway — see
+[Reverse proxy](#reverse-proxy) above for a working nginx example.
 
 ## Startup checks
 
