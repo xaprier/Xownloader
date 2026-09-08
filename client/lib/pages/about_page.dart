@@ -3,6 +3,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../config/app_config.dart';
 import '../l10n/app_strings_scope.dart';
+import '../services/admin_token_store.dart';
+import 'admin_gate_page.dart';
+import 'admin_home_page.dart';
 
 const _repositoryUrl = 'https://github.com/xaprier/Xownloader';
 const _developerUrl = 'https://github.com/xaprier';
@@ -20,7 +23,16 @@ class AboutPage extends StatelessWidget {
     final text = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text(strings.aboutPageTitle)),
+      appBar: AppBar(
+        title: Text(strings.aboutPageTitle),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.admin_panel_settings_outlined),
+            tooltip: strings.adminEntryTooltip,
+            onPressed: () => _openAdmin(context),
+          ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
@@ -79,6 +91,19 @@ class AboutPage extends StatelessWidget {
         Uri.parse(url),
         mode: LaunchMode.externalApplication,
       );
+
+  static Future<void> _openAdmin(BuildContext context) async {
+    final store = SecureAdminTokenStore();
+    final token = await store.read();
+    if (!context.mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => token == null || token.isEmpty
+            ? AdminGatePage(tokenStore: store)
+            : AdminHomePage(tokenStore: store, token: token),
+      ),
+    );
+  }
 }
 
 class _InfoRow extends StatelessWidget {
