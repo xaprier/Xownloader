@@ -7,11 +7,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:xownloader/main.dart';
 import 'package:xownloader/services/download_api.dart';
+import 'package:xownloader/services/locale_controller.dart';
 import 'package:xownloader/services/theme_controller.dart';
 
 Future<ThemeController> _loadedController() async {
   final prefs = await SharedPreferences.getInstance();
   final controller = ThemeController(prefs);
+  await controller.load();
+  return controller;
+}
+
+Future<LocaleController> _loadedLocaleController() async {
+  final prefs = await SharedPreferences.getInstance();
+  final controller = LocaleController(prefs);
   await controller.load();
   return controller;
 }
@@ -96,7 +104,7 @@ Future<void> _inspectAndQueue(WidgetTester tester, String url) async {
 void main() {
   testWidgets('shows the configured server URL', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(MyApp(themeController: await _loadedController()));
+    await tester.pumpWidget(MyApp(themeController: await _loadedController(), localeController: await _loadedLocaleController()));
 
     expect(find.text('Server: http://127.0.0.1:8000'), findsOneWidget);
   });
@@ -105,7 +113,7 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(MyApp(themeController: await _loadedController()));
+    await tester.pumpWidget(MyApp(themeController: await _loadedController(), localeController: await _loadedLocaleController()));
 
     expect(
       find.image(const AssetImage('assets/icon/logo_mark.png')),
@@ -120,7 +128,7 @@ void main() {
 
   testWidgets('starts in the mode the controller reports', (tester) async {
     SharedPreferences.setMockInitialValues({'theme_mode': 'light'});
-    await tester.pumpWidget(MyApp(themeController: await _loadedController()));
+    await tester.pumpWidget(MyApp(themeController: await _loadedController(), localeController: await _loadedLocaleController()));
 
     expect(_appThemeMode(tester), ThemeMode.light);
   });
@@ -128,7 +136,12 @@ void main() {
   testWidgets('theme menu switches the app to dark mode', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final controller = await _loadedController();
-    await tester.pumpWidget(MyApp(themeController: controller));
+    await tester.pumpWidget(
+      MyApp(
+        themeController: controller,
+        localeController: await _loadedLocaleController(),
+      ),
+    );
     expect(_appThemeMode(tester), ThemeMode.system);
 
     await tester.tap(find.byKey(const Key('theme-menu')));
@@ -144,7 +157,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final api = DownloadApi(baseUrl: 'http://x', client: _QueueFakeClient());
     await tester.pumpWidget(
-      MyApp(themeController: await _loadedController(), api: api),
+      MyApp(themeController: await _loadedController(), localeController: await _loadedLocaleController(), api: api),
     );
 
     await _inspectAndQueue(tester, 'https://youtu.be/a');
@@ -167,7 +180,7 @@ void main() {
       client: _QueueFakeClient(completeImmediately: true),
     );
     await tester.pumpWidget(
-      MyApp(themeController: await _loadedController(), api: api),
+      MyApp(themeController: await _loadedController(), localeController: await _loadedLocaleController(), api: api),
     );
 
     await _inspectAndQueue(tester, 'https://youtu.be/a');

@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xownloader/l10n/app_strings.dart';
+import 'package:xownloader/l10n/app_strings_scope.dart';
 import 'package:xownloader/widgets/result_actions.dart';
 
 void main() {
   final fileUri = Uri.parse('http://127.0.0.1:8000/api/v1/downloads/job-1/file');
 
-  Widget host() => MaterialApp(
-        home: Scaffold(body: ResultActions(fileUri: fileUri)),
+  Widget host() => AppStringsScope(
+        strings: AppStrings.of(const Locale('en')),
+        child: MaterialApp(
+          home: Scaffold(body: ResultActions(fileUri: fileUri)),
+        ),
       );
 
   testWidgets('offers copy and open actions', (tester) async {

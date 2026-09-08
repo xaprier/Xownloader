@@ -6,11 +6,19 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xownloader/main.dart';
 import 'package:xownloader/services/download_api.dart';
+import 'package:xownloader/services/locale_controller.dart';
 import 'package:xownloader/services/theme_controller.dart';
 
 Future<ThemeController> _loadedController() async {
   final prefs = await SharedPreferences.getInstance();
   final controller = ThemeController(prefs);
+  await controller.load();
+  return controller;
+}
+
+Future<LocaleController> _loadedLocaleController() async {
+  final prefs = await SharedPreferences.getInstance();
+  final controller = LocaleController(prefs);
   await controller.load();
   return controller;
 }
@@ -38,7 +46,11 @@ void main() {
     final api = DownloadApi(baseUrl: 'http://localhost:8000', client: _GoneClient());
 
     await tester.pumpWidget(
-      MyApp(themeController: await _loadedController(), api: api),
+      MyApp(
+        themeController: await _loadedController(),
+        localeController: await _loadedLocaleController(),
+        api: api,
+      ),
     );
 
     await tester.enterText(

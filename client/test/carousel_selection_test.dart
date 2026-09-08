@@ -6,11 +6,19 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xownloader/main.dart';
 import 'package:xownloader/services/download_api.dart';
+import 'package:xownloader/services/locale_controller.dart';
 import 'package:xownloader/services/theme_controller.dart';
 
 Future<ThemeController> _loadedController() async {
   final prefs = await SharedPreferences.getInstance();
   final controller = ThemeController(prefs);
+  await controller.load();
+  return controller;
+}
+
+Future<LocaleController> _loadedLocaleController() async {
+  final prefs = await SharedPreferences.getInstance();
+  final controller = LocaleController(prefs);
   await controller.load();
   return controller;
 }
@@ -40,12 +48,24 @@ void main() {
   testWidgets(
     'carousel preview shows one checkbox per item and submits the selection',
     (tester) async {
+      // The default 800x600 test surface is too short to lay out the
+      // carousel's checkbox rows plus the always-visible Inspect URL button
+      // without scrolling; a taller surface keeps this test scroll-free.
+      tester.view.physicalSize = const Size(800, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       SharedPreferences.setMockInitialValues({});
       final client = _StubClient(_previewJson, _jobJson);
       final api = DownloadApi(baseUrl: 'http://localhost:8000', client: client);
 
       await tester.pumpWidget(
-        MyApp(themeController: await _loadedController(), api: api),
+        MyApp(
+          themeController: await _loadedController(),
+          localeController: await _loadedLocaleController(),
+          api: api,
+        ),
       );
 
       await tester.enterText(

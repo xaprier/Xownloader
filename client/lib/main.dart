@@ -7,9 +7,13 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config/app_config.dart';
+import 'l10n/app_strings.dart';
+import 'l10n/app_strings_scope.dart';
 import 'models/download_job.dart';
 import 'models/media_preview.dart';
+import 'pages/about_page.dart';
 import 'services/download_api.dart';
+import 'services/locale_controller.dart';
 import 'services/share_intent_service.dart';
 import 'services/theme_controller.dart';
 import 'theme/app_theme.dart';
@@ -19,11 +23,15 @@ import 'widgets/result_actions.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env', isOptional: true);
-  final themeController = ThemeController(await SharedPreferences.getInstance());
+  final prefs = await SharedPreferences.getInstance();
+  final themeController = ThemeController(prefs);
   await themeController.load();
+  final localeController = LocaleController(prefs);
+  await localeController.load();
   runApp(
     MyApp(
       themeController: themeController,
+      localeController: localeController,
       api: DownloadApi(
         baseUrl: AppConfig.serverUrl,
         token: AppConfig.clientApiToken,
@@ -32,30 +40,52 @@ Future<void> main() async {
   );
 }
 
+/// Resolves to the device language when the user hasn't picked one, limited
+/// to the languages we actually support.
+Locale _resolveLocale(LocaleController controller) {
+  final explicit = controller.locale;
+  if (explicit != null) return explicit;
+  final device = WidgetsBinding.instance.platformDispatcher.locale;
+  return device.languageCode == 'tr' ? const Locale('tr') : const Locale('en');
+}
+
 class MyApp extends StatelessWidget {
-  const MyApp({required this.themeController, super.key, this.api});
+  const MyApp({
+    required this.themeController,
+    required this.localeController,
+    super.key,
+    this.api,
+  });
 
   final ThemeController themeController;
+  final LocaleController localeController;
   final DownloadApi? api;
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: themeController,
+      listenable: Listenable.merge([themeController, localeController]),
       builder: (context, _) {
-        return MaterialApp(
-          title: 'Xownloader',
-          theme: lightTheme,
-          darkTheme: darkTheme,
-          themeMode: themeController.mode,
-          home: DownloadPage(
-            themeController: themeController,
-            api:
-                api ??
-                DownloadApi(
-                  baseUrl: AppConfig.serverUrl,
-                  token: AppConfig.clientApiToken,
-                ),
+        final locale = _resolveLocale(localeController);
+        return AppStringsScope(
+          strings: AppStrings.of(locale),
+          child: MaterialApp(
+            title: 'Xownloader',
+            theme: lightTheme,
+            darkTheme: darkTheme,
+            themeMode: themeController.mode,
+            locale: locale,
+            supportedLocales: AppStrings.supportedLocales,
+            home: DownloadPage(
+              themeController: themeController,
+              localeController: localeController,
+              api:
+                  api ??
+                  DownloadApi(
+                    baseUrl: AppConfig.serverUrl,
+                    token: AppConfig.clientApiToken,
+                  ),
+            ),
           ),
         );
       },
@@ -71,6 +101,7 @@ class ThemeModeMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = context.strings;
     return PopupMenuButton<ThemeMode>(
       key: const Key('theme-menu'),
       icon: Icon(switch (controller.mode) {
@@ -78,24 +109,72 @@ class ThemeModeMenu extends StatelessWidget {
         ThemeMode.light => Icons.light_mode,
         ThemeMode.dark => Icons.dark_mode,
       }),
-      tooltip: 'Theme',
+      tooltip: strings.themeTooltip,
       initialValue: controller.mode,
       onSelected: controller.setMode,
-      itemBuilder: (context) => const [
+      itemBuilder: (context) => [
         PopupMenuItem(
           value: ThemeMode.system,
           child: ListTile(
-            leading: Icon(Icons.brightness_auto),
-            title: Text('System'),
+            leading: const Icon(Icons.brightness_auto),
+            title: Text(strings.themeSystem),
           ),
         ),
         PopupMenuItem(
           value: ThemeMode.light,
-          child: ListTile(leading: Icon(Icons.light_mode), title: Text('Light')),
+          child: ListTile(
+            leading: const Icon(Icons.light_mode),
+            title: Text(strings.themeLight),
+          ),
         ),
         PopupMenuItem(
           value: ThemeMode.dark,
-          child: ListTile(leading: Icon(Icons.dark_mode), title: Text('Dark')),
+          child: ListTile(
+            leading: const Icon(Icons.dark_mode),
+            title: Text(strings.themeDark),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// AppBar control that picks the app language, or follows the device.
+class LanguageMenu extends StatelessWidget {
+  const LanguageMenu({required this.controller, super.key});
+
+  final LocaleController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = context.strings;
+    return PopupMenuButton<Locale?>(
+      key: const Key('language-menu'),
+      icon: const Icon(Icons.translate),
+      tooltip: strings.languageTooltip,
+      initialValue: controller.locale,
+      onSelected: controller.setLocale,
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: null,
+          child: ListTile(
+            leading: const Icon(Icons.smartphone),
+            title: Text(strings.languageSystemLabel),
+          ),
+        ),
+        PopupMenuItem(
+          value: const Locale('en'),
+          child: ListTile(
+            leading: const SizedBox(width: 24, child: Text('EN')),
+            title: Text(strings.languageEnglish),
+          ),
+        ),
+        PopupMenuItem(
+          value: const Locale('tr'),
+          child: ListTile(
+            leading: const SizedBox(width: 24, child: Text('TR')),
+            title: Text(strings.languageTurkish),
+          ),
         ),
       ],
     );
@@ -106,11 +185,13 @@ class DownloadPage extends StatefulWidget {
   const DownloadPage({
     required this.api,
     required this.themeController,
+    required this.localeController,
     super.key,
   });
 
   final DownloadApi api;
   final ThemeController themeController;
+  final LocaleController localeController;
 
   @override
   State<DownloadPage> createState() => _DownloadPageState();
@@ -144,6 +225,7 @@ class _DownloadPageState extends State<DownloadPage> {
   final _urlController = TextEditingController();
   final List<_QueuedJob> _jobs = [];
   MediaPreview? _preview;
+  String? _lastInspectedUrl;
   Timer? _pollTimer;
   StreamSubscription<String>? _shareSubscription;
   Set<int> _selectedMedia = {};
@@ -180,7 +262,11 @@ class _DownloadPageState extends State<DownloadPage> {
   Future<void> _inspectUrl() async {
     final sourceUrl = _urlController.text.trim();
     if (sourceUrl.isEmpty) {
-      setState(() => _error = 'Enter a YouTube or Instagram URL.');
+      setState(() => _error = context.strings.enterUrlError);
+      return;
+    }
+    // Same URL, same result already on screen — don't re-request.
+    if (sourceUrl == _lastInspectedUrl && _preview != null) {
       return;
     }
     setState(() {
@@ -193,6 +279,7 @@ class _DownloadPageState extends State<DownloadPage> {
       if (!mounted) return;
       setState(() {
         _preview = preview;
+        _lastInspectedUrl = sourceUrl;
         _selectedMedia = preview.mediaItems == null
             ? {}
             : preview.mediaItems!.map((item) => item.index).toSet();
@@ -208,7 +295,7 @@ class _DownloadPageState extends State<DownloadPage> {
       });
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'Could not reach the download server.');
+        setState(() => _error = context.strings.serverUnreachableError);
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -224,6 +311,17 @@ class _DownloadPageState extends State<DownloadPage> {
     _urlController.text = url;
     _urlController.selection = TextSelection.collapsed(offset: url.length);
     _inspectUrl();
+  }
+
+  void _clearUrl() {
+    setState(() {
+      _urlController.clear();
+      _preview = null;
+      _lastInspectedUrl = null;
+      _selectedMedia = {};
+      _error = null;
+      _warning = null;
+    });
   }
 
   bool _isActive(DownloadJob job) =>
@@ -255,6 +353,7 @@ class _DownloadPageState extends State<DownloadPage> {
       setState(() {
         _jobs.insert(0, _QueuedJob(job, title));
         _preview = null;
+        _lastInspectedUrl = null;
         _selectedMedia = {};
         _quality = null;
         _audioBitrate = null;
@@ -274,7 +373,7 @@ class _DownloadPageState extends State<DownloadPage> {
       });
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'Could not reach the download server.');
+        setState(() => _error = context.strings.serverUnreachableError);
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -331,6 +430,7 @@ class _DownloadPageState extends State<DownloadPage> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = context.strings;
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 12,
@@ -346,7 +446,10 @@ class _DownloadPageState extends State<DownloadPage> {
             const Text('Xownloader'),
           ],
         ),
-        actions: [ThemeModeMenu(controller: widget.themeController)],
+        actions: [
+          LanguageMenu(controller: widget.localeController),
+          ThemeModeMenu(controller: widget.themeController),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -361,6 +464,15 @@ class _DownloadPageState extends State<DownloadPage> {
                 api: widget.api,
                 onCancel: _cancel,
               ),
+              const SizedBox(height: 20),
+              Center(
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AboutPage()),
+                  ),
+                  child: Text(strings.aboutFooterCta),
+                ),
+              ),
             ],
           ),
         ),
@@ -369,38 +481,43 @@ class _DownloadPageState extends State<DownloadPage> {
   }
 
   List<Widget> _buildComposer(BuildContext context) {
+    final strings = context.strings;
     return [
       Text(
-        'Download media',
+        strings.downloadMediaHeading,
         style: Theme.of(context).textTheme.headlineMedium,
       ),
       const SizedBox(height: 8),
-      Text('Server: ${AppConfig.serverUrl}'),
+      Text(strings.serverLabel(AppConfig.serverUrl)),
       const SizedBox(height: 24),
       TextField(
         controller: _urlController,
         keyboardType: TextInputType.url,
-        decoration: const InputDecoration(
-          labelText: 'YouTube or Instagram URL',
-          helperText:
-              'youtube.com/watch · youtu.be · instagram.com/p · /reel · /stories',
+        onChanged: (_) => setState(() {}),
+        decoration: InputDecoration(
+          labelText: strings.urlFieldLabel,
+          helperText: strings.urlFieldHelper,
           helperMaxLines: 2,
+          suffixIcon: _urlController.text.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: strings.clearUrlTooltip,
+                  onPressed: _clearUrl,
+                ),
         ),
         onSubmitted: (_) => _inspectUrl(),
       ),
       const SizedBox(height: 16),
+      FilledButton.icon(
+        onPressed: _submitting ? null : _inspectUrl,
+        icon: _submitting ? const _ButtonSpinner() : const Icon(Icons.search),
+        label: Text(_submitting ? strings.inspectingLabel : strings.inspectUrlLabel),
+      ),
+      const SizedBox(height: 16),
       if (_preview == null) ...[
         const _SupportedLinks(),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: _submitting ? null : _inspectUrl,
-          icon: _submitting
-              ? const _ButtonSpinner()
-              : const Icon(Icons.search),
-          label: Text(_submitting ? 'Inspecting...' : 'Inspect URL'),
-        ),
-      ]
-      else if (_preview!.isCarouselCapable) ...[
+      ] else if (_preview!.isCarouselCapable) ...[
         _PreviewCard(preview: _preview!),
         const SizedBox(height: 8),
         for (final item in _preview!.mediaItems!)
@@ -413,9 +530,9 @@ class _DownloadPageState extends State<DownloadPage> {
                 _selectedMedia.remove(item.index);
               }
             }),
-            title: Text('Item ${item.index + 1} · ${item.type}'),
+            title: Text(strings.itemLabel(item.index + 1, item.type)),
             subtitle: item.durationSeconds != null
-                ? Text(formatDuration(item.durationSeconds))
+                ? Text(_durationLabel(strings, item.durationSeconds))
                 : null,
             secondary: Icon(
               item.type == 'video' ? Icons.videocam : Icons.image,
@@ -429,7 +546,7 @@ class _DownloadPageState extends State<DownloadPage> {
           icon: _submitting
               ? const _ButtonSpinner()
               : const Icon(Icons.playlist_add),
-          label: Text(_submitting ? 'Submitting...' : 'Add to queue'),
+          label: Text(_submitting ? strings.submittingLabel : strings.addToQueueLabel),
         ),
       ] else ...[
         _PreviewCard(preview: _preview!),
@@ -453,9 +570,9 @@ class _DownloadPageState extends State<DownloadPage> {
             DropdownButton<String?>(
               value: _quality,
               items: [
-                const DropdownMenuItem(
+                DropdownMenuItem(
                   value: null,
-                  child: Text('Auto quality'),
+                  child: Text(strings.autoQualityLabel),
                 ),
                 ..._preview!.allowedVideoQualities.map(
                   (quality) => DropdownMenuItem(
@@ -469,9 +586,9 @@ class _DownloadPageState extends State<DownloadPage> {
             DropdownButton<String?>(
               value: _audioBitrate,
               items: [
-                const DropdownMenuItem(
+                DropdownMenuItem(
                   value: null,
-                  child: Text('Auto audio'),
+                  child: Text(strings.autoAudioLabel),
                 ),
                 ..._preview!.allowedAudioBitrates.map(
                   (bitrate) => DropdownMenuItem(
@@ -490,7 +607,7 @@ class _DownloadPageState extends State<DownloadPage> {
           icon: _submitting
               ? const _ButtonSpinner()
               : const Icon(Icons.playlist_add),
-          label: Text(_submitting ? 'Submitting...' : 'Add to queue'),
+          label: Text(_submitting ? strings.submittingLabel : strings.addToQueueLabel),
         ),
       ],
       if (_error != null) ...[
@@ -505,6 +622,14 @@ class _DownloadPageState extends State<DownloadPage> {
   }
 }
 
+String _durationLabel(AppStrings strings, int? totalSeconds) => formatDuration(
+      totalSeconds,
+      unknownLabel: strings.unknownLengthLabel,
+      hourLabel: strings.hourLabel,
+      minuteLabel: strings.minuteLabel,
+      secondLabel: strings.secondLabel,
+    );
+
 class _PreviewCard extends StatelessWidget {
   const _PreviewCard({required this.preview});
 
@@ -512,6 +637,7 @@ class _PreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = context.strings;
     return Card(
       child: ListTile(
         leading: preview.thumbnail == null
@@ -546,7 +672,7 @@ class _PreviewCard extends StatelessWidget {
           [
             if (preview.uploader != null) preview.uploader!,
             if (preview.durationSeconds != null)
-              formatDuration(preview.durationSeconds),
+              _durationLabel(strings, preview.durationSeconds),
           ].join(' - '),
         ),
       ),
@@ -569,6 +695,7 @@ class _QueueSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final strings = context.strings;
 
     if (jobs.isEmpty) {
       return _EmptyQueueFrame(
@@ -577,12 +704,12 @@ class _QueueSection extends StatelessWidget {
             Icon(Icons.inbox_outlined, color: scheme.onSurfaceVariant),
             const SizedBox(height: 8),
             Text(
-              'Your queue is empty',
+              strings.emptyQueueTitle,
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 2),
             Text(
-              'Inspect a URL above to add the first download.',
+              strings.emptyQueueSubtitle,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: scheme.onSurfaceVariant,
               ),
@@ -607,7 +734,7 @@ class _QueueSection extends StatelessWidget {
             child: Row(
               children: [
                 Text(
-                  'QUEUE',
+                  strings.queueTitle,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.2,
@@ -661,32 +788,33 @@ class _CountPill extends StatelessWidget {
 ({Color color, IconData icon, String label}) _statusStyle(
   DownloadStatus status,
   ColorScheme scheme,
+  AppStrings strings,
 ) {
   return switch (status) {
     DownloadStatus.queued => (
       color: scheme.onSurfaceVariant,
       icon: Icons.schedule,
-      label: 'QUEUED',
+      label: strings.statusQueued,
     ),
     DownloadStatus.downloading => (
       color: const Color(0xFF3B82F6),
       icon: Icons.download,
-      label: 'DOWNLOADING',
+      label: strings.statusDownloading,
     ),
     DownloadStatus.completed => (
       color: const Color(0xFF22C55E),
       icon: Icons.check_circle,
-      label: 'COMPLETED',
+      label: strings.statusCompleted,
     ),
     DownloadStatus.failed => (
       color: scheme.error,
       icon: Icons.error_outline,
-      label: 'FAILED',
+      label: strings.statusFailed,
     ),
     DownloadStatus.cancelled => (
       color: scheme.outline,
       icon: Icons.block,
-      label: 'CANCELLED',
+      label: strings.statusCancelled,
     ),
   };
 }
@@ -698,7 +826,11 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = _statusStyle(status, Theme.of(context).colorScheme);
+    final style = _statusStyle(
+      status,
+      Theme.of(context).colorScheme,
+      context.strings,
+    );
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -735,7 +867,7 @@ class _JobCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final job = entry.job;
-    final style = _statusStyle(job.status, scheme);
+    final style = _statusStyle(job.status, scheme, context.strings);
 
     return Container(
       clipBehavior: Clip.antiAlias,
@@ -783,6 +915,7 @@ class _JobCard extends StatelessWidget {
 
   List<Widget> _detail(BuildContext context, DownloadJob job) {
     final scheme = Theme.of(context).colorScheme;
+    final strings = context.strings;
     final muted = Theme.of(context).textTheme.bodySmall?.copyWith(
       color: scheme.onSurfaceVariant,
     );
@@ -812,7 +945,7 @@ class _JobCard extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(child: Text('Waiting for a free slot', style: muted)),
+              Expanded(child: Text(strings.waitingForSlot, style: muted)),
               _CancelButton(onCancel: onCancel),
             ],
           ),
@@ -820,12 +953,12 @@ class _JobCard extends StatelessWidget {
       case DownloadStatus.failed:
         return [
           const SizedBox(height: 10),
-          _ErrorBanner(message: job.error ?? 'The download failed.'),
+          _ErrorBanner(message: job.error ?? strings.downloadFailedFallback),
         ];
       case DownloadStatus.cancelled:
         return [
           const SizedBox(height: 6),
-          Text('You cancelled this download.', style: muted),
+          Text(strings.cancelledMessage, style: muted),
         ];
       case DownloadStatus.completed:
         final artifacts = job.artifacts;
@@ -882,27 +1015,26 @@ class _CancelButton extends StatelessWidget {
         foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
       ),
       icon: const Icon(Icons.close, size: 16),
-      label: const Text('Cancel'),
+      label: Text(context.strings.cancelLabel),
     );
   }
 }
 
-/// A quiet outlined panel for the empty-queue placeholder.
-/// Quiet reference panel shown before the first inspect, so a new user knows
-/// which links work.
+/// A quiet reference panel shown before the first inspect, so a new user
+/// knows which links work.
 class _SupportedLinks extends StatelessWidget {
   const _SupportedLinks();
-
-  static const _rows = <(String, String, String)>[
-    ('YouTube', 'video or short', 'youtube.com/watch?v=… · youtu.be/…'),
-    ('Instagram', 'post or reel', 'instagram.com/p/… · instagram.com/reel/…'),
-    ('Instagram', 'story or highlight', 'instagram.com/stories/…'),
-  ];
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
+    final strings = context.strings;
+    final rows = <(String, String, String)>[
+      ('YouTube', strings.linkKindVideoOrShort, 'youtube.com/watch?v=… · youtu.be/…'),
+      ('Instagram', strings.linkKindPostOrReel, 'instagram.com/p/… · instagram.com/reel/…'),
+      ('Instagram', strings.linkKindStoryOrHighlight, 'instagram.com/stories/…'),
+    ];
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
@@ -913,7 +1045,7 @@ class _SupportedLinks extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'SUPPORTED LINKS',
+            strings.supportedLinksTitle,
             style: text.labelSmall?.copyWith(
               fontWeight: FontWeight.w700,
               letterSpacing: 1.1,
@@ -921,7 +1053,7 @@ class _SupportedLinks extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          for (final (provider, what, example) in _rows)
+          for (final (provider, what, example) in rows)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Column(
@@ -955,7 +1087,7 @@ class _SupportedLinks extends StatelessWidget {
               ),
             ),
           Text(
-            'Carousels and highlights let you pick which items to download.',
+            strings.supportedLinksFooter,
             style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],
