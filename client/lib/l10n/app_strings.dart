@@ -87,6 +87,23 @@ abstract class AppStrings {
   String get aboutDeveloperLabel;
   String get aboutRepositoryLabel;
   String aboutVersionLabel(String version);
+
+  // Admin
+  String get adminEntryTooltip;
+  String get adminGateTitle;
+  String get adminTokenFieldLabel;
+  String get adminGateSubmitLabel;
+  String get adminInvalidTokenError;
+  String get adminSessionExpiredMessage;
+  String get adminHomeTitle;
+  String get adminSignOutTooltip;
+  String get adminStatusTab;
+  String get adminJobsTab;
+  String get adminMetricsTab;
+  String get adminJobsTotalLabel;
+  String get adminNoJobsMessage;
+  String adminStorageFreeOfTotal(String free, String total);
+  String adminRuntimeLabel(String key);
 }
 
 class _EnStrings extends AppStrings {
@@ -216,6 +233,48 @@ class _EnStrings extends AppStrings {
   String get aboutRepositoryLabel => 'Source code';
   @override
   String aboutVersionLabel(String version) => 'Version $version';
+
+  @override
+  String get adminEntryTooltip => 'Admin';
+  @override
+  String get adminGateTitle => 'Admin sign-in';
+  @override
+  String get adminTokenFieldLabel => 'Admin token';
+  @override
+  String get adminGateSubmitLabel => 'Continue';
+  @override
+  String get adminInvalidTokenError => 'Invalid admin token';
+  @override
+  String get adminSessionExpiredMessage => 'Your admin session is no longer valid.';
+  @override
+  String get adminHomeTitle => 'Admin';
+  @override
+  String get adminSignOutTooltip => 'Sign out';
+  @override
+  String get adminStatusTab => 'Status';
+  @override
+  String get adminJobsTab => 'Jobs';
+  @override
+  String get adminMetricsTab => 'Metrics';
+  @override
+  String get adminJobsTotalLabel => 'Total';
+  @override
+  String get adminNoJobsMessage => 'No jobs yet.';
+  @override
+  String adminStorageFreeOfTotal(String free, String total) => '$free free of $total';
+  @override
+  String adminRuntimeLabel(String key) {
+    const labels = {
+      'ready': 'Ready',
+      'yt_dlp': 'yt-dlp',
+      'ffmpeg': 'FFmpeg',
+      'ffprobe': 'ffprobe',
+      'output_directory': 'Output directory',
+      'disk_reserve': 'Disk reserve',
+      'instagram_configured': 'Instagram configured',
+    };
+    return labels[key] ?? key;
+  }
 }
 
 class _TrStrings extends AppStrings {
@@ -346,4 +405,46 @@ class _TrStrings extends AppStrings {
   String get aboutRepositoryLabel => 'Kaynak kod';
   @override
   String aboutVersionLabel(String version) => 'Sürüm $version';
+
+  @override
+  String get adminEntryTooltip => 'Yönetici';
+  @override
+  String get adminGateTitle => 'Yönetici girişi';
+  @override
+  String get adminTokenFieldLabel => 'Yönetici anahtarı';
+  @override
+  String get adminGateSubmitLabel => 'Devam et';
+  @override
+  String get adminInvalidTokenError => 'Geçersiz yönetici anahtarı';
+  @override
+  String get adminSessionExpiredMessage => 'Yönetici oturumunuz artık geçerli değil.';
+  @override
+  String get adminHomeTitle => 'Yönetici';
+  @override
+  String get adminSignOutTooltip => 'Çıkış yap';
+  @override
+  String get adminStatusTab => 'Durum';
+  @override
+  String get adminJobsTab => 'İşler';
+  @override
+  String get adminMetricsTab => 'Metrikler';
+  @override
+  String get adminJobsTotalLabel => 'Toplam';
+  @override
+  String get adminNoJobsMessage => 'Henüz iş yok.';
+  @override
+  String adminStorageFreeOfTotal(String free, String total) => '$total üzerinden $free boş';
+  @override
+  String adminRuntimeLabel(String key) {
+    const labels = {
+      'ready': 'Hazır',
+      'yt_dlp': 'yt-dlp',
+      'ffmpeg': 'FFmpeg',
+      'ffprobe': 'ffprobe',
+      'output_directory': 'Çıktı dizini',
+      'disk_reserve': 'Disk rezervi',
+      'instagram_configured': 'Instagram yapılandırıldı',
+    };
+    return labels[key] ?? key;
+  }
 }
