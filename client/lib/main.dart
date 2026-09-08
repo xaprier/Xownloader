@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config/app_config.dart';
@@ -77,6 +78,11 @@ class MyApp extends StatelessWidget {
             themeMode: themeController.mode,
             locale: locale,
             supportedLocales: AppStrings.supportedLocales,
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
             home: DownloadPage(
               themeController: themeController,
               localeController: localeController,
