@@ -19,6 +19,7 @@ import 'services/theme_controller.dart';
 import 'theme/app_theme.dart';
 import 'utils/duration_format.dart';
 import 'widgets/result_actions.dart';
+import 'widgets/status_badge.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -785,77 +786,6 @@ class _CountPill extends StatelessWidget {
   }
 }
 
-({Color color, IconData icon, String label}) _statusStyle(
-  DownloadStatus status,
-  ColorScheme scheme,
-  AppStrings strings,
-) {
-  return switch (status) {
-    DownloadStatus.queued => (
-      color: scheme.onSurfaceVariant,
-      icon: Icons.schedule,
-      label: strings.statusQueued,
-    ),
-    DownloadStatus.downloading => (
-      color: const Color(0xFF3B82F6),
-      icon: Icons.download,
-      label: strings.statusDownloading,
-    ),
-    DownloadStatus.completed => (
-      color: const Color(0xFF22C55E),
-      icon: Icons.check_circle,
-      label: strings.statusCompleted,
-    ),
-    DownloadStatus.failed => (
-      color: scheme.error,
-      icon: Icons.error_outline,
-      label: strings.statusFailed,
-    ),
-    DownloadStatus.cancelled => (
-      color: scheme.outline,
-      icon: Icons.block,
-      label: strings.statusCancelled,
-    ),
-  };
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status});
-
-  final DownloadStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = _statusStyle(
-      status,
-      Theme.of(context).colorScheme,
-      context.strings,
-    );
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: style.color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(style.icon, size: 13, color: style.color),
-          const SizedBox(width: 4),
-          Text(
-            style.label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: style.color,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.6,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _JobCard extends StatelessWidget {
   const _JobCard({required this.entry, required this.api, required this.onCancel});
 
@@ -867,7 +797,7 @@ class _JobCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final job = entry.job;
-    final style = _statusStyle(job.status, scheme, context.strings);
+    final style = jobStatusStyle(job.status, scheme, context.strings);
 
     return Container(
       clipBehavior: Clip.antiAlias,
@@ -899,7 +829,7 @@ class _JobCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        _StatusBadge(status: job.status),
+                        StatusBadge(status: job.status),
                       ],
                     ),
                     ..._detail(context, job),
