@@ -38,30 +38,36 @@ curl -s   http://localhost:8000/ready   # expect "ready": true
 
 ## Instagram provider
 
-The Instagram adapter needs a logged-in account cookie in
-`XOWNLOADER_INSTAGRAM_COOKIE`. Obtain it from a browser session (F12 -> Network ->
-an `instagram.com` request -> Request Headers -> `Cookie`). It expires after days
-to weeks; when Instagram previews start returning "session is invalid or
-expired", refresh it.
+The Instagram adapter authenticates via [instagrapi](https://github.com/subzeroid/instagrapi)
+using a dedicated account's username and password
+(`XOWNLOADER_INSTAGRAM_USERNAME` / `XOWNLOADER_INSTAGRAM_PASSWORD`). On first use
+it logs in and writes a session file to `XOWNLOADER_INSTAGRAM_SESSION_PATH`
+(default `data/instagram_session.json`, inside the bind-mounted `data/`
+directory — it survives `docker compose down`/`up` without a separate volume).
+Later requests reuse that session instead of logging in again.
 
 This is intended for a self-hosted instance with few users. A shared account
-used for high-volume automated access is more likely to hit a challenge or a
-block - use a dedicated account, and raise
+used for high-volume automated access is more likely to hit a checkpoint,
+two-factor prompt, or a block — use a dedicated account, and raise
 `XOWNLOADER_INSTAGRAM_DOWNLOAD_DELAY_SECONDS` if downloads are being throttled.
-`GET /ready` reports `instagram_configured` but does not call Instagram; cookie
-validity surfaces on the first real request.
+If Instagram rejects the login (checkpoint, 2FA, or a stale session it cannot
+refresh), the server does not crash: the Instagram provider stops accepting
+requests for 5 minutes (returning `502` with "session is invalid or expired")
+before it tries logging in again, so it does not hammer a flagged account.
+Resolving a checkpoint or 2FA challenge requires signing into the account
+manually (e.g. from a browser or the Instagram app) and is not automated.
+`GET /ready` reports `instagram_configured` (username is set) but does not call
+Instagram; login validity surfaces on the first real request.
 
 Supported URL shapes: a post or reel (`/p/`, `/reel/`, `/tv/`), a highlight
 (`/stories/highlights/<id>/`), a single story (`/stories/<user>/<pk>/`), and a
-user's active stories (`/stories/<user>/`). Story requests resolve the account's
-numeric id from the `usernameinfo` endpoint and cache it until restart; the older
-`web_profile_info` lookup is rate-limited and is not used.
+user's active stories (`/stories/<user>/`).
 
 Error vs warning: a genuine failure (invalid session, network, Instagram rate
-limit, malformed URL) returns `400`/`401`/`403`/`429`/`5xx`. A story or highlight
-that is expired, removed, private, or empty returns `410` — the client shows this
-as a warning, not an error. If every story request returns `429`, the account is
-being throttled; back off and retry later.
+limit, malformed URL) returns `502`/`5xx`. A story, highlight, or post that is
+expired, removed, private, or empty returns `410` — the client shows this as a
+warning, not an error. If Instagram requests keep failing with the rate-limit
+message, the account is being throttled; back off and retry later.
 
 ## Configuration
 

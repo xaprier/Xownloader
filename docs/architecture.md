@@ -38,8 +38,8 @@ adapters must not own HTTP routes, client state, or retention policy.
 - A completed file cannot exceed the configured maximum size and receives an expiration time.
 - Cleanup runs periodically and removes expired files; clients never decide retention.
 - Provider adapters are the only layer allowed to know how a provider is downloaded.
-- Instagram is a second provider adapter. It requires a server-configured account cookie
-  (`XOWNLOADER_INSTAGRAM_COOKIE`); without one, Instagram URLs are rejected. Supported URL
+- Instagram is a second provider adapter. It requires a server-configured account
+  (`XOWNLOADER_INSTAGRAM_USERNAME`/`XOWNLOADER_INSTAGRAM_PASSWORD`); without them, Instagram URLs are rejected. Supported URL
   shapes: a single public post or reel (`/p/`, `/reel/`, `/tv/`); a highlight
   (`/stories/highlights/<id>/`), all items; a single story (`/stories/<user>/<pk>/`); and
   a user's active stories (`/stories/<user>/`). Carousels, highlights, and multi-item
