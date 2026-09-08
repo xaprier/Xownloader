@@ -2,9 +2,10 @@
 
 Xownloader is a cross-platform media downloader built around a self-hosted backend.
 It downloads YouTube media through `yt-dlp`, and public Instagram posts, reels,
-stories, and highlights through a dedicated adapter. Instagram support requires a
-server-configured account cookie; without one, Instagram URLs are rejected and
-YouTube is unaffected.
+stories, and highlights through [instagrapi](https://github.com/subzeroid/instagrapi).
+Instagram support requires a server-configured account (username, password, and a
+TOTP seed if the account has two-factor authentication); without one, Instagram URLs
+are rejected and YouTube is unaffected.
 
 ## Project shape
 
@@ -39,7 +40,8 @@ Instagram profile feeds and comment retrieval are out of scope.
 
 - Python 3.11 or newer
 - `uv` for server dependency management
-- `yt-dlp` and its runtime dependencies
+- `yt-dlp` and its runtime dependencies (YouTube); `instagrapi` (Instagram) — both
+  installed as server dependencies via `uv sync`
 - Flutter stable channel for the client
 
 The current development machine has Python, `uv`, and Flutter. Android builds additionally

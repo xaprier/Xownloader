@@ -3,8 +3,10 @@
 The server is a FastAPI application. It owns URL validation, provider execution, job
 state, file delivery, and retention cleanup. A `ProviderRegistry` picks the provider from
 the URL host: YouTube through `yt-dlp`, and Instagram (posts, reels, carousels, stories,
-highlights) through a direct HTTP adapter that needs `XOWNLOADER_INSTAGRAM_COOKIE`.
-Provider adapters stay behind the shared, provider-neutral API models.
+highlights) through [instagrapi](https://github.com/subzeroid/instagrapi), which needs
+`XOWNLOADER_INSTAGRAM_USERNAME` and `XOWNLOADER_INSTAGRAM_PASSWORD` (plus
+`XOWNLOADER_INSTAGRAM_TOTP_SEED` for a two-factor account). Provider adapters stay behind
+the shared, provider-neutral API models.
 
 ## API resources
 

@@ -68,6 +68,13 @@ Supported URL shapes: a post or reel (`/p/`, `/reel/`, `/tv/`), a highlight
 (`/stories/highlights/<id>/`), a single story (`/stories/<user>/<pk>/`), and a
 user's active stories (`/stories/<user>/`).
 
+**Known issue:** with instagrapi 2.18.18, a highlight request can fail with a
+`pydantic.ValidationError` on `user.friendship_status.user_id` — instagrapi's
+`Highlight` model has not been updated for a field Instagram's current API
+response omits. This is a library/API version-drift bug, not an account or
+configuration problem; a newer instagrapi release may fix it. Posts, reels,
+and stories are unaffected.
+
 Error vs warning: a genuine failure (invalid session, network, Instagram rate
 limit, malformed URL) returns `502`/`5xx`. A story, highlight, or post that is
 expired, removed, private, or empty returns `410` — the client shows this as a

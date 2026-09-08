@@ -17,7 +17,8 @@ download counters for monitoring.
 To run the server in a container instead: `cd server && docker compose up -d --build`
 (FFmpeg is bundled). See [operations.md](operations.md#container) for details.
 
-Set `XOWNLOADER_INSTAGRAM_USERNAME` and `XOWNLOADER_INSTAGRAM_PASSWORD` to enable the Instagram provider; see
+Set `XOWNLOADER_INSTAGRAM_USERNAME` and `XOWNLOADER_INSTAGRAM_PASSWORD` to enable the
+[instagrapi](https://github.com/subzeroid/instagrapi)-backed Instagram provider; see
 [operations.md](operations.md#instagram-provider). Without them, Instagram URLs are rejected
 and YouTube is unaffected.
 

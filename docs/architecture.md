@@ -18,7 +18,8 @@ while download policy and retention remain server-owned.
 3. The user confirms the options (and, for a multi-item Instagram source, which items) and
    the API validates the request and creates a download job.
 4. A server worker runs the provider adapter with server-side policy — `yt-dlp` for
-   YouTube, direct HTTP against the Instagram private API otherwise.
+   YouTube, [instagrapi](https://github.com/subzeroid/instagrapi) (Instagram's private
+   mobile API) otherwise.
 5. The job exposes progress and a terminal state to the client.
 6. The server returns or streams the output while retaining it only for the configured
    period.
@@ -38,16 +39,21 @@ adapters must not own HTTP routes, client state, or retention policy.
 - A completed file cannot exceed the configured maximum size and receives an expiration time.
 - Cleanup runs periodically and removes expired files; clients never decide retention.
 - Provider adapters are the only layer allowed to know how a provider is downloaded.
-- Instagram is a second provider adapter. It requires a server-configured account
-  (`XOWNLOADER_INSTAGRAM_USERNAME`/`XOWNLOADER_INSTAGRAM_PASSWORD`); without them, Instagram URLs are rejected. Supported URL
-  shapes: a single public post or reel (`/p/`, `/reel/`, `/tv/`); a highlight
-  (`/stories/highlights/<id>/`), all items; a single story (`/stories/<user>/<pk>/`); and
-  a user's active stories (`/stories/<user>/`). Carousels, highlights, and multi-item
-  story sets produce one artifact per selected media item, each addressable at
-  `/api/v1/downloads/{id}/media/{index}`. Story user-id resolution uses the mobile
-  `usernameinfo` endpoint (the browser `web_profile_info` lookup is rate-limited) and the
-  resolved id is cached per adapter instance. Instagram profile feeds and comments are out
-  of scope.
+- Instagram is a second provider adapter, backed by
+  [instagrapi](https://github.com/subzeroid/instagrapi) (a real account's private mobile
+  API session, not a scraped web page). It requires a server-configured account
+  (`XOWNLOADER_INSTAGRAM_USERNAME`/`XOWNLOADER_INSTAGRAM_PASSWORD`, plus
+  `XOWNLOADER_INSTAGRAM_TOTP_SEED` if the account has two-factor authentication); without
+  them, Instagram URLs are rejected. Supported URL shapes: a single public post or reel
+  (`/p/`, `/reel/`, `/tv/`); a highlight (`/stories/highlights/<id>/`), all items; a single
+  story (`/stories/<user>/<pk>/`); and a user's active stories (`/stories/<user>/`).
+  Carousels, highlights, and multi-item story sets produce one artifact per selected media
+  item, each addressable at `/api/v1/downloads/{id}/media/{index}`. The adapter logs in
+  lazily on first use and persists the resulting session to
+  `XOWNLOADER_INSTAGRAM_SESSION_PATH` so later requests reuse it instead of logging in
+  again; a login failure (invalid credentials, checkpoint, expired session) disables the
+  Instagram provider for 5 minutes rather than retrying immediately. Instagram profile
+  feeds and comments are out of scope.
 - When an Instagram URL is understood but the content cannot be retrieved — an expired or
   deleted story, a highlight that was removed, an account with no active stories — the
   preview responds `410 Gone` with a plain message. The client renders that as a warning,
