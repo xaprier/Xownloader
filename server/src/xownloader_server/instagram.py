@@ -4,12 +4,15 @@ import asyncio
 import json
 import re
 import socket
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
+
+from instagrapi.exceptions import ClientError
 
 from xownloader_server.errors import (
     PolicyViolation,
@@ -333,3 +336,71 @@ class InstagramAdapter:
     def _read_bytes(request: urllib.request.Request) -> bytes:
         with urllib.request.urlopen(request, timeout=60) as response:
             return response.read()
+
+
+_SESSION_COOLDOWN_SECONDS = 300.0
+
+
+class InstagrapiClient(Protocol):
+    def load_settings(self, path: Path) -> object: ...
+    def dump_settings(self, path: Path) -> None: ...
+    def login(self, username: str, password: str) -> bool: ...
+    def media_pk_from_code(self, code: str) -> str: ...
+    def media_info(self, media_pk: str) -> object: ...
+    def user_id_from_username(self, username: str) -> str: ...
+    def user_stories(self, user_id: str) -> list: ...
+    def highlight_info(self, highlight_pk: str) -> object: ...
+
+
+ClientFactory = Callable[[], InstagrapiClient]
+Clock = Callable[[], float]
+
+
+class InstagramSessionManager:
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        session_path: Path,
+        *,
+        client_factory: ClientFactory,
+        cooldown_seconds: float = _SESSION_COOLDOWN_SECONDS,
+        clock: Clock = time.monotonic,
+    ) -> None:
+        self._username = username
+        self._password = password
+        self._session_path = session_path
+        self._client_factory = client_factory
+        self._cooldown_seconds = cooldown_seconds
+        self._clock = clock
+        self._client: InstagrapiClient | None = None
+        self._authenticated = False
+        self._cooldown_until: float | None = None
+
+    def ensure_ready(self) -> InstagrapiClient:
+        if self._authenticated and self._client is not None:
+            return self._client
+        if self._cooldown_until is not None:
+            if self._clock() < self._cooldown_until:
+                raise PreviewUnavailable("Instagram session is invalid or expired")
+            self._cooldown_until = None
+        client = self._client_factory()
+        if self._session_path.exists():
+            try:
+                client.load_settings(self._session_path)
+            except (OSError, ValueError):
+                pass
+        try:
+            client.login(self._username, self._password)
+        except ClientError as error:
+            self._cooldown_until = self._clock() + self._cooldown_seconds
+            raise PreviewUnavailable("Instagram session is invalid or expired") from error
+        self._session_path.parent.mkdir(parents=True, exist_ok=True)
+        client.dump_settings(self._session_path)
+        self._client = client
+        self._authenticated = True
+        return client
+
+    def invalidate(self) -> None:
+        self._authenticated = False
+        self._cooldown_until = self._clock() + self._cooldown_seconds
