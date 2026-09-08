@@ -64,6 +64,10 @@ adapters must not own HTTP routes, client state, or retention policy.
    liveness, readiness, and counters without exposing provider internals to clients.
 - Access control uses instance API tokens rather than user accounts: client scope is for
    download operations, while admin scope is required for all-job and operational views.
+   Unlike the client token (baked into the Flutter build via `.env`), the admin token is
+   entered at runtime through a hidden admin surface (reachable from the client's About
+   page) and stored in the platform's secure storage — it is never bundled into a build,
+   since it is a materially more sensitive credential than the client token.
 - The completed-file routes (`/api/v1/downloads/{id}/file`, `/file/{name}`, and the
    per-artifact `/api/v1/downloads/{id}/media/{index}` / `.../media/{index}/{name}`) are
    unauthenticated: the unguessable job id is the capability and retention expiry bounds

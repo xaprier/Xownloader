@@ -27,6 +27,17 @@ picks which to download. Progress polling, cancellation, and per-file result lin
 submission. A failed request shows a red error; an expired or empty Instagram story or
 highlight shows an amber warning instead.
 
+## Admin
+
+The About page's admin icon opens a read-only operational view: runtime status
+(yt-dlp/FFmpeg/disk/Instagram readiness), the full list of every user's jobs, and the
+raw `/metrics` Prometheus text. It requires an admin API token — the same one set via
+`XOWNLOADER_ADMIN_API_TOKEN` on the server — entered once and stored via
+`flutter_secure_storage` (the platform keychain/keystore), never baked into the build
+the way `XOWNLOADER_CLIENT_API_TOKEN` is. A `401` from any admin request clears the
+stored token and returns to the sign-in screen. No job cancellation or other mutating
+action is exposed here yet.
+
 ## Share intent
 
 Android is configured to receive `text/plain` shares from YouTube and other apps. A
