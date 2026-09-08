@@ -1,3 +1,5 @@
+import logging
+
 from pydantic import HttpUrl
 
 from xownloader_server.config import Settings
@@ -14,6 +16,8 @@ from xownloader_server.models import (
 from xownloader_server.policy import ServerPolicy
 from xownloader_server.rate_limit import RateLimiter
 from xownloader_server.registry import ProviderRegistry, build_registry
+
+logger = logging.getLogger(__name__)
 
 
 class PreviewService:
@@ -42,6 +46,10 @@ class PreviewService:
         except (PreviewUnavailable, ProviderContentUnavailable, PolicyViolation):
             raise
         except Exception as error:  # noqa: BLE001
+            logger.exception(
+                "preview_inspect_failed",
+                extra={"provider": provider, "error_type": type(error).__name__},
+            )
             raise PreviewUnavailable("The provider metadata could not be loaded") from error
 
         if metadata.get("media_items") is not None:
