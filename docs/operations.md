@@ -32,8 +32,11 @@ curl -s   http://localhost:8000/ready   # expect "ready": true
   (`ports: "8000:8000"`) or place it behind a reverse proxy that terminates TLS.
 - `.env` values still apply — set `XOWNLOADER_CLIENT_API_TOKEN`,
   `XOWNLOADER_ADMIN_API_TOKEN`, and `XOWNLOADER_CORS_ALLOWED_ORIGINS` for a real
-  deployment. `XOWNLOADER_HOST`, `XOWNLOADER_DOWNLOAD_DIRECTORY`, and
-  `XOWNLOADER_DATABASE_PATH` are fixed by compose and should not be overridden.
+  deployment. `XOWNLOADER_HOST`, `XOWNLOADER_DOWNLOAD_DIRECTORY`,
+  `XOWNLOADER_DATABASE_PATH`, and `XOWNLOADER_INSTAGRAM_SESSION_PATH` are fixed by
+  compose and should not be overridden — `.env`'s default for the session path is a
+  relative path meant for local (non-container) runs; inside the container it must
+  point into the bind-mounted `/data` volume or the session will not survive a restart.
 - `docker compose down` stops the server; the bind-mounted data survives.
 
 ## Instagram provider

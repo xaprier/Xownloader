@@ -25,6 +25,11 @@ services:
       XOWNLOADER_HOST: 0.0.0.0
       XOWNLOADER_DOWNLOAD_DIRECTORY: /data/downloads
       XOWNLOADER_DATABASE_PATH: /data/xownloader.db
+      # .env's default (./data/instagram_session.json) resolves against the
+      # container's WORKDIR (/app), landing outside the bind-mounted volume —
+      # the session would never persist across restarts. Force it into /data
+      # like the paths above.
+      XOWNLOADER_INSTAGRAM_SESSION_PATH: /data/instagram_session.json
       HOME: /tmp
       # Trust X-Forwarded-For only from the reverse proxy hop (this network's
       # gateway). A direct client cannot spoof its rate-limit identity.
