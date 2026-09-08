@@ -39,14 +39,7 @@ class _RoutingClient extends http.BaseClient {
       );
     }
     final path = request.url.path;
-    String body;
-    if (path.endsWith('/admin/status')) {
-      body = _statusJson;
-    } else if (path.endsWith('/admin/jobs')) {
-      body = _jobsJson;
-    } else {
-      body = 'downloads_created_total 5\n';
-    }
+    final body = path.endsWith('/admin/jobs') ? _jobsJson : _statusJson;
     return http.StreamedResponse(
       Stream.value(utf8.encode(body)),
       200,
@@ -71,16 +64,26 @@ Widget _host(AdminTokenStore store, {int statusCode = 200}) => AppStringsScope(
     );
 
 void main() {
-  testWidgets('Status tab shows job counts and storage', (tester) async {
+  testWidgets('Status tab shows job count tiles, disk percent, and storage line',
+      (tester) async {
+    // The default 800x600 test surface is too short to lay out the runtime
+    // panel, the count-tile grid, and the disk card without scrolling.
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await tester.pumpWidget(_host(FakeAdminTokenStore()));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
 
-    expect(find.textContaining('3'), findsWidgets); // total jobs
-    expect(find.textContaining('KB'), findsOneWidget); // storage line
+    expect(find.text('3'), findsOneWidget); // total jobs tile
+    expect(find.text('50%'), findsOneWidget); // 1024 free of 2048 total
+    expect(find.textContaining('KB'), findsWidgets); // storage line
   });
 
-  testWidgets('Jobs tab lists jobs from fetchJobs', (tester) async {
+  testWidgets('Jobs tab lists jobs with a status badge and a copy action',
+      (tester) async {
     await tester.pumpWidget(_host(FakeAdminTokenStore()));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
@@ -89,17 +92,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('https://youtu.be/x'), findsOneWidget);
-  });
-
-  testWidgets('Metrics tab shows the raw Prometheus text', (tester) async {
-    await tester.pumpWidget(_host(FakeAdminTokenStore()));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 20));
-
-    await tester.tap(find.text('Metrics'));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('downloads_created_total 5'), findsOneWidget);
+    expect(find.text('COMPLETED'), findsOneWidget);
+    expect(find.text('Copy link'), findsOneWidget);
+    expect(find.text('Open'), findsOneWidget);
   });
 
   testWidgets('a 401 clears the stored token and returns to the gate',

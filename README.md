@@ -103,8 +103,9 @@ branches with reviewed merges for repository contributions.
 Version 2.x: YouTube plus Instagram posts, reels, carousels, stories, and highlights,
 with token-scoped auth, SQLite job persistence, progress reporting, retention cleanup,
 and a Flutter client for all targets. The Flutter client also includes a read-only admin
-surface (runtime status, all-user job list, raw metrics) reachable from the About page,
-gated by a runtime-entered admin token stored in the platform's secure storage.
+surface (runtime status with job counts and disk usage, all-user job list) reachable
+from the About page, gated by a runtime-entered admin token stored in the platform's
+secure storage.
 
 ## License
 

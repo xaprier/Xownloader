@@ -46,14 +46,20 @@ void main() {
     expect(jobs.single.id, 'job-1');
   });
 
-  test('fetchMetricsText returns the raw response body as-is', () async {
-    final client = FakeHttpClient(200, 'downloads_created_total 5\n');
-    final api = AdminApi(baseUrl: 'http://host:8000', token: 'secret', client: client);
+  test('fileUri builds a plain path without a display name', () {
+    final api = AdminApi(baseUrl: 'http://host:8000', token: 'secret');
+    expect(
+      api.fileUri('job-1').toString(),
+      'http://host:8000/api/v1/downloads/job-1/file',
+    );
+  });
 
-    final text = await api.fetchMetricsText();
-
-    expect(client.lastRequest?.url.toString(), 'http://host:8000/metrics');
-    expect(text, 'downloads_created_total 5\n');
+  test('mediaUri encodes the display name', () {
+    final api = AdminApi(baseUrl: 'http://host:8000', token: 'secret');
+    expect(
+      api.mediaUri('job-1', 2, displayName: 'my video.mp4').toString(),
+      'http://host:8000/api/v1/downloads/job-1/media/2/my%20video.mp4',
+    );
   });
 
   test('a non-2xx response throws DownloadApiException with the server detail', () async {
@@ -75,7 +81,7 @@ void main() {
     final api = AdminApi(baseUrl: 'http://host:8000', token: 'secret', client: client);
 
     await expectLater(
-      api.fetchMetricsText(),
+      api.fetchJobs(),
       throwsA(
         isA<DownloadApiException>()
             .having((e) => e.statusCode, 'statusCode', 500)

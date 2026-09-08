@@ -99,9 +99,9 @@ abstract class AppStrings {
   String get adminSignOutTooltip;
   String get adminStatusTab;
   String get adminJobsTab;
-  String get adminMetricsTab;
   String get adminJobsTotalLabel;
   String get adminNoJobsMessage;
+  String get adminDiskFreeLabel;
   String adminStorageFreeOfTotal(String free, String total);
   String adminRuntimeLabel(String key);
 }
@@ -255,11 +255,11 @@ class _EnStrings extends AppStrings {
   @override
   String get adminJobsTab => 'Jobs';
   @override
-  String get adminMetricsTab => 'Metrics';
-  @override
   String get adminJobsTotalLabel => 'Total';
   @override
   String get adminNoJobsMessage => 'No jobs yet.';
+  @override
+  String get adminDiskFreeLabel => 'free';
   @override
   String adminStorageFreeOfTotal(String free, String total) => '$free free of $total';
   @override
@@ -427,11 +427,11 @@ class _TrStrings extends AppStrings {
   @override
   String get adminJobsTab => 'İşler';
   @override
-  String get adminMetricsTab => 'Metrikler';
-  @override
   String get adminJobsTotalLabel => 'Toplam';
   @override
   String get adminNoJobsMessage => 'Henüz iş yok.';
+  @override
+  String get adminDiskFreeLabel => 'boş';
   @override
   String adminStorageFreeOfTotal(String free, String total) => '$total üzerinden $free boş';
   @override

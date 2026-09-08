@@ -34,11 +34,22 @@ class AdminApi {
         .toList();
   }
 
-  /// The raw Prometheus exposition text — not parsed or charted.
-  Future<String> fetchMetricsText() async {
-    final response = await _client.get(_uri('/metrics'), headers: _headers);
-    _checkOk(response);
-    return response.body;
+  /// The completed-file routes are unauthenticated (the unguessable job id
+  /// is the capability — see docs/architecture.md), so these need no token.
+  Uri fileUri(String jobId, {String? displayName}) {
+    const base = '/api/v1/downloads';
+    if (displayName == null || displayName.isEmpty) {
+      return _uri('$base/$jobId/file');
+    }
+    return _uri('$base/$jobId/file/${Uri.encodeComponent(displayName)}');
+  }
+
+  Uri mediaUri(String jobId, int index, {String? displayName}) {
+    const base = '/api/v1/downloads';
+    if (displayName == null || displayName.isEmpty) {
+      return _uri('$base/$jobId/media/$index');
+    }
+    return _uri('$base/$jobId/media/$index/${Uri.encodeComponent(displayName)}');
   }
 
   Map<String, String> get _headers => {

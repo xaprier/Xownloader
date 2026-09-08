@@ -30,8 +30,9 @@ highlight shows an amber warning instead.
 ## Admin
 
 The About page's admin icon opens a read-only operational view: runtime status
-(yt-dlp/FFmpeg/disk/Instagram readiness), the full list of every user's jobs, and the
-raw `/metrics` Prometheus text. It requires an admin API token — the same one set via
+(yt-dlp/FFmpeg/disk/Instagram readiness) with job counts and disk usage, and the full
+list of every user's jobs (with the same copy-link/open actions as the main queue). It
+requires an admin API token — the same one set via
 `XOWNLOADER_ADMIN_API_TOKEN` on the server — entered once and stored via
 `flutter_secure_storage` (the platform keychain/keystore), never baked into the build
 the way `XOWNLOADER_CLIENT_API_TOKEN` is. A `401` from any admin request clears the
