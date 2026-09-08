@@ -80,7 +80,8 @@ async def test_instagram_preview_returns_media_items_and_empty_policy_lists(tmp_
         Settings(
             download_directory=tmp_path,
             min_free_disk_mb=0,
-            instagram_cookie=SecretStr("sessionid=abc; csrftoken=xyz"),
+            instagram_username="nasa",
+            instagram_password=SecretStr("hunter2"),
         ),
         registry=ProviderRegistry.with_adapters({"instagram": FakeInstagramAdapter()}),
     )
@@ -163,7 +164,8 @@ async def test_preview_service_raises_policy_violation_for_malformed_story(tmp_p
         Settings(
             download_directory=tmp_path,
             min_free_disk_mb=0,
-            instagram_cookie=SecretStr("sessionid=a; csrftoken=b"),
+            instagram_username="nasa",
+            instagram_password=SecretStr("hunter2"),
         )
     )
     with pytest.raises(PolicyViolation):

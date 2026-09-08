@@ -24,7 +24,9 @@ class Settings(BaseSettings):
     allowed_video_qualities: str = "480p,720p,1080p"
     allowed_audio_bitrates: str = "128K,192K,320K"
     cors_allowed_origins: str = "http://localhost:8080,http://127.0.0.1:8080"
-    instagram_cookie: SecretStr | None = None
+    instagram_username: str | None = None
+    instagram_password: SecretStr | None = None
+    instagram_session_path: Path = Path("./data/instagram_session.json")
     instagram_download_delay_seconds: float = Field(default=2.0, ge=0)
 
     @property

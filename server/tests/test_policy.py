@@ -75,7 +75,8 @@ def test_policy_accepts_instagram_when_configured(tmp_path: Path) -> None:
         Settings(
             download_directory=tmp_path,
             min_free_disk_mb=0,
-            instagram_cookie=SecretStr("sessionid=abc; csrftoken=xyz"),
+            instagram_username="nasa",
+            instagram_password=SecretStr("hunter2"),
         )
     )
     provider = policy.validate_source_url(

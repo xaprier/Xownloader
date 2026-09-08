@@ -44,12 +44,13 @@ def _default_hosts() -> dict[str, str]:
 
 def build_registry(settings: Settings) -> ProviderRegistry:
     adapters: dict[str, ProviderAdapter] = {"youtube": YtDlpAdapter()}
-    cookie = settings.instagram_cookie.get_secret_value() if settings.instagram_cookie else None
-    if cookie:
+    if settings.instagram_username and settings.instagram_password:
         from xownloader_server.instagram import InstagramAdapter
 
         adapters["instagram"] = InstagramAdapter(
-            cookie,
+            settings.instagram_username,
+            settings.instagram_password.get_secret_value(),
+            settings.instagram_session_path,
             delay_seconds=settings.instagram_download_delay_seconds,
         )
     return ProviderRegistry(adapters, _default_hosts())

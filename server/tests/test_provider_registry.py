@@ -11,18 +11,19 @@ def test_youtube_hosts_resolve_without_configuration(tmp_path):
     assert registry.has("youtube") is True
 
 
-def test_instagram_host_is_known_but_unconfigured_without_cookie(tmp_path):
+def test_instagram_host_is_known_but_unconfigured_without_credentials(tmp_path):
     registry = build_registry(Settings(download_directory=tmp_path, min_free_disk_mb=0))
     assert registry.provider_for_host("www.instagram.com") == "instagram"
     assert registry.has("instagram") is False
 
 
-def test_instagram_is_configured_when_cookie_present(tmp_path):
+def test_instagram_is_configured_when_credentials_present(tmp_path):
     registry = build_registry(
         Settings(
             download_directory=tmp_path,
             min_free_disk_mb=0,
-            instagram_cookie=SecretStr("sessionid=abc; csrftoken=xyz"),
+            instagram_username="nasa",
+            instagram_password=SecretStr("hunter2"),
         )
     )
     assert registry.has("instagram") is True

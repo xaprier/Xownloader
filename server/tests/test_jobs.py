@@ -91,7 +91,8 @@ async def test_carousel_job_produces_one_artifact_per_selected_index(tmp_path: P
         min_free_disk_mb=0,
         retention_hours=12,
         max_file_size_mb=1,
-        instagram_cookie=SecretStr("sessionid=abc; csrftoken=xyz"),
+        instagram_username="nasa",
+        instagram_password=SecretStr("hunter2"),
     )
     manager = JobManager(settings, adapter=CarouselAdapter())
     job = await manager.create_job(
