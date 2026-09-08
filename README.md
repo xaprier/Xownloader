@@ -109,5 +109,5 @@ secure storage.
 
 ## License
 
-No license has been selected yet. Do not redistribute this project until a license
-and the applicable provider terms have been reviewed.
+MIT — see [LICENSE](LICENSE). Using the YouTube and Instagram providers remains
+subject to those platforms' own terms of service.
