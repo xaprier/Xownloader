@@ -144,9 +144,16 @@ class _StatusTab extends StatelessWidget {
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _RuntimePanel(runtime: status.runtime),
-            const SizedBox(height: 20),
-            _JobCountGrid(counts: status.jobCounts),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: _RuntimePanel(runtime: status.runtime)),
+                  const SizedBox(width: 16),
+                  Expanded(child: _JobCountPanel(counts: status.jobCounts)),
+                ],
+              ),
+            ),
             const SizedBox(height: 20),
             _DiskUsageCard(freeBytes: status.freeBytes, totalBytes: status.totalBytes),
           ],
@@ -185,7 +192,14 @@ class _RuntimePanel extends StatelessWidget {
                     color: entry.value ? const Color(0xFF22C55E) : scheme.error,
                   ),
                   const SizedBox(width: 10),
-                  Text(strings.adminRuntimeLabel(entry.key)),
+                  Expanded(
+                    child: Text(
+                      strings.adminRuntimeLabel(entry.key),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -195,20 +209,21 @@ class _RuntimePanel extends StatelessWidget {
   }
 }
 
-class _JobCountGrid extends StatelessWidget {
-  const _JobCountGrid({required this.counts});
+class _JobCountPanel extends StatelessWidget {
+  const _JobCountPanel({required this.counts});
 
   final Map<String, int> counts;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
     final strings = context.strings;
 
     Color colorFor(DownloadStatus status) => jobStatusStyle(status, scheme, strings).color;
     IconData iconFor(DownloadStatus status) => jobStatusStyle(status, scheme, strings).icon;
 
-    final tiles = [
+    final rows = [
       (scheme.primary, Icons.list_alt, strings.adminJobsTotalLabel, counts['total'] ?? 0),
       (
         colorFor(DownloadStatus.queued),
@@ -236,66 +251,37 @@ class _JobCountGrid extends StatelessWidget {
       ),
     ];
 
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 2.6,
-      children: [
-        for (final (color, icon, label, value) in tiles)
-          _StatTile(color: color, icon: icon, label: label, value: value),
-      ],
-    );
-  }
-}
-
-class _StatTile extends StatelessWidget {
-  const _StatTile({
-    required this.color,
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  final Color color;
-  final IconData icon;
-  final String label;
-  final int value;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outlineVariant),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '$value',
-                  style: text.titleLarge?.copyWith(fontWeight: FontWeight.w700, color: color),
-                ),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: text.labelSmall?.copyWith(color: color),
-                ),
-              ],
+          for (final (color, icon, label, value) in rows)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Icon(icon, size: 16, color: color),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: text.bodyMedium?.copyWith(color: color),
+                    ),
+                  ),
+                  Text(
+                    '$value',
+                    style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: color),
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
