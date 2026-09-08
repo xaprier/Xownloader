@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import time
 import urllib.request
@@ -26,6 +27,8 @@ from xownloader_server.errors import (
     ProviderContentUnavailable,
 )
 from xownloader_server.models import DownloadJob
+
+logger = logging.getLogger(__name__)
 
 _POST_URL = re.compile(r"instagram\.com/(?:p|reel|reels|tv)/([A-Za-z0-9_-]+)")
 _HIGHLIGHT_URL = re.compile(r"instagram\.com/stories/highlights/(\d+)")
@@ -83,7 +86,8 @@ class MediaNode:
 class InstagrapiClient(Protocol):
     def load_settings(self, path: Path) -> object: ...
     def dump_settings(self, path: Path) -> None: ...
-    def login(self, username: str, password: str) -> bool: ...
+    def login(self, username: str, password: str, verification_code: str = "") -> bool: ...
+    def totp_generate_code(self, seed: str) -> str: ...
     def media_pk_from_code(self, code: str) -> str: ...
     def media_info(self, media_pk: str) -> Media: ...
     def user_id_from_username(self, username: str) -> str: ...
@@ -105,6 +109,7 @@ class InstagramSessionManager:
         session_path: Path,
         *,
         client_factory: ClientFactory,
+        totp_seed: str | None = None,
         cooldown_seconds: float = _SESSION_COOLDOWN_SECONDS,
         clock: Clock = time.monotonic,
     ) -> None:
@@ -112,6 +117,9 @@ class InstagramSessionManager:
         self._password = password
         self._session_path = session_path
         self._client_factory = client_factory
+        # Instagram displays the TOTP setup key in space-separated groups; strip
+        # them so a pasted-as-shown seed still base32-decodes correctly.
+        self._totp_seed = totp_seed.replace(" ", "") if totp_seed else None
         self._cooldown_seconds = cooldown_seconds
         self._clock = clock
         self._client: InstagrapiClient | None = None
@@ -123,6 +131,10 @@ class InstagramSessionManager:
             return self._client
         if self._cooldown_until is not None:
             if self._clock() < self._cooldown_until:
+                logger.warning(
+                    "instagram_login_cooldown_active",
+                    extra={"retry_after_seconds": self._cooldown_until - self._clock()},
+                )
                 raise PreviewUnavailable("Instagram session is invalid or expired")
             self._cooldown_until = None
         client = self._client_factory()
@@ -132,19 +144,32 @@ class InstagramSessionManager:
             except (OSError, ValueError):
                 pass
         try:
-            client.login(self._username, self._password)
-        except ClientError as error:
+            verification_code = (
+                client.totp_generate_code(self._totp_seed) if self._totp_seed else ""
+            )
+            client.login(self._username, self._password, verification_code=verification_code)
+        except (ClientError, ValueError) as error:
             self._cooldown_until = self._clock() + self._cooldown_seconds
+            logger.warning(
+                "instagram_login_failed",
+                extra={
+                    "error_type": type(error).__name__,
+                    "error": str(error),
+                    "cooldown_seconds": self._cooldown_seconds,
+                },
+            )
             raise PreviewUnavailable("Instagram session is invalid or expired") from error
         self._session_path.parent.mkdir(parents=True, exist_ok=True)
         client.dump_settings(self._session_path)
         self._client = client
         self._authenticated = True
+        logger.info("instagram_login_succeeded", extra={"username": self._username})
         return client
 
     def invalidate(self) -> None:
         self._authenticated = False
         self._cooldown_until = self._clock() + self._cooldown_seconds
+        logger.info("instagram_session_invalidated")
 
 
 class InstagramAdapter:
@@ -156,6 +181,7 @@ class InstagramAdapter:
         password: str,
         session_path: Path,
         *,
+        totp_seed: str | None = None,
         delay_seconds: float = 0.0,
         client_factory: ClientFactory | None = None,
         fetch_bytes: FetchBytes | None = None,
@@ -170,6 +196,7 @@ class InstagramAdapter:
             password,
             session_path,
             client_factory=client_factory or self._default_client_factory,
+            totp_seed=totp_seed,
         )
 
     @staticmethod

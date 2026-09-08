@@ -51,6 +51,11 @@ def build_registry(settings: Settings) -> ProviderRegistry:
             settings.instagram_username,
             settings.instagram_password.get_secret_value(),
             settings.instagram_session_path,
+            totp_seed=(
+                settings.instagram_totp_seed.get_secret_value()
+                if settings.instagram_totp_seed
+                else None
+            ),
             delay_seconds=settings.instagram_download_delay_seconds,
         )
     return ProviderRegistry(adapters, _default_hosts())

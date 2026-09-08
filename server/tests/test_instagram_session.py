@@ -9,6 +9,7 @@ class _FakeClient:
     def __init__(self, *, login_error=None):
         self.login_error = login_error
         self.login_calls = 0
+        self.login_verification_codes = []
         self.loaded_settings_path = None
         self.dumped_settings_path = None
 
@@ -18,20 +19,25 @@ class _FakeClient:
     def dump_settings(self, path):
         self.dumped_settings_path = path
 
-    def login(self, username, password):
+    def login(self, username, password, verification_code=""):
         self.login_calls += 1
+        self.login_verification_codes.append(verification_code)
         if self.login_error is not None:
             raise self.login_error
         return True
 
+    def totp_generate_code(self, seed):
+        return "totp-for-" + seed
 
-def _manager(tmp_path, *, client=None, cooldown_seconds=300.0, clock=None):
+
+def _manager(tmp_path, *, client=None, cooldown_seconds=300.0, clock=None, totp_seed=None):
     client = client or _FakeClient()
     manager = InstagramSessionManager(
         "nasa",
         "hunter2",
         tmp_path / "session.json",
         client_factory=lambda: client,
+        totp_seed=totp_seed,
         cooldown_seconds=cooldown_seconds,
         clock=clock or (lambda: 0.0),
     )
@@ -97,6 +103,24 @@ def test_ensure_ready_retries_login_after_cooldown_expires(tmp_path):
     with pytest.raises(PreviewUnavailable):
         manager.ensure_ready()
     assert client.login_calls == 2
+
+
+def test_ensure_ready_passes_totp_code_when_seed_configured(tmp_path):
+    manager, client = _manager(tmp_path, totp_seed="SEED123")
+    manager.ensure_ready()
+    assert client.login_verification_codes == ["totp-for-SEED123"]
+
+
+def test_ensure_ready_strips_spaces_from_totp_seed(tmp_path):
+    manager, client = _manager(tmp_path, totp_seed="SEED 123 456")
+    manager.ensure_ready()
+    assert client.login_verification_codes == ["totp-for-SEED123456"]
+
+
+def test_ensure_ready_passes_empty_code_without_totp_seed(tmp_path):
+    manager, client = _manager(tmp_path)
+    manager.ensure_ready()
+    assert client.login_verification_codes == [""]
 
 
 def test_invalidate_forces_relogin_and_starts_cooldown(tmp_path):

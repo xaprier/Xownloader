@@ -46,6 +46,11 @@ it logs in and writes a session file to `XOWNLOADER_INSTAGRAM_SESSION_PATH`
 directory — it survives `docker compose down`/`up` without a separate volume).
 Later requests reuse that session instead of logging in again.
 
+If the account has two-factor authentication enabled, set
+`XOWNLOADER_INSTAGRAM_TOTP_SEED` to the TOTP setup key/secret shown when
+linking an authenticator app (not a rotating 6-digit code) — the server
+generates a fresh code from it on every login attempt.
+
 This is intended for a self-hosted instance with few users. A shared account
 used for high-volume automated access is more likely to hit a checkpoint,
 two-factor prompt, or a block — use a dedicated account, and raise

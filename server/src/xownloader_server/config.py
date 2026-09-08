@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     cors_allowed_origins: str = "http://localhost:8080,http://127.0.0.1:8080"
     instagram_username: str | None = None
     instagram_password: SecretStr | None = None
+    instagram_totp_seed: SecretStr | None = None
     instagram_session_path: Path = Path("./data/instagram_session.json")
     instagram_download_delay_seconds: float = Field(default=2.0, ge=0)
 

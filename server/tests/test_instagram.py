@@ -108,9 +108,12 @@ class FakeInstagrapiClient:
     def dump_settings(self, path):
         return None
 
-    def login(self, username, password):
+    def login(self, username, password, verification_code=""):
         self.login_calls += 1
         return True
+
+    def totp_generate_code(self, seed):
+        return "totp-for-" + seed
 
     def media_pk_from_code(self, code):
         return "pk-" + code
