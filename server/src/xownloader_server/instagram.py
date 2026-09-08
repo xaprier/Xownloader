@@ -159,8 +159,17 @@ class InstagramSessionManager:
                 },
             )
             raise PreviewUnavailable("Instagram session is invalid or expired") from error
-        self._session_path.parent.mkdir(parents=True, exist_ok=True)
-        client.dump_settings(self._session_path)
+        try:
+            self._session_path.parent.mkdir(parents=True, exist_ok=True)
+            client.dump_settings(self._session_path)
+        except OSError as error:
+            # Login already succeeded — an unwritable session path means this
+            # process must log in again next restart, not that this request
+            # should fail.
+            logger.warning(
+                "instagram_session_persist_failed",
+                extra={"path": str(self._session_path), "error": str(error)},
+            )
         self._client = client
         self._authenticated = True
         logger.info("instagram_login_succeeded", extra={"username": self._username})

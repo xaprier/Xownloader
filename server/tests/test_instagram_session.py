@@ -6,8 +6,9 @@ from xownloader_server.instagram import InstagramSessionManager
 
 
 class _FakeClient:
-    def __init__(self, *, login_error=None):
+    def __init__(self, *, login_error=None, dump_settings_error=None):
         self.login_error = login_error
+        self.dump_settings_error = dump_settings_error
         self.login_calls = 0
         self.login_verification_codes = []
         self.loaded_settings_path = None
@@ -17,6 +18,8 @@ class _FakeClient:
         self.loaded_settings_path = path
 
     def dump_settings(self, path):
+        if self.dump_settings_error is not None:
+            raise self.dump_settings_error
         self.dumped_settings_path = path
 
     def login(self, username, password, verification_code=""):
@@ -103,6 +106,18 @@ def test_ensure_ready_retries_login_after_cooldown_expires(tmp_path):
     with pytest.raises(PreviewUnavailable):
         manager.ensure_ready()
     assert client.login_calls == 2
+
+
+def test_ensure_ready_survives_unwritable_session_path(tmp_path):
+    client = _FakeClient(dump_settings_error=PermissionError("denied"))
+    manager, _ = _manager(tmp_path, client=client)
+    result = manager.ensure_ready()
+    assert result is client
+    assert client.dumped_settings_path is None
+    # Login succeeded, so a second call must not log in again even though
+    # persistence failed.
+    manager.ensure_ready()
+    assert client.login_calls == 1
 
 
 def test_ensure_ready_passes_totp_code_when_seed_configured(tmp_path):
